@@ -4,8 +4,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useDocumentStore } from '../store/useDocumentStore';
 import { colors, spacing, typeScale } from '../theme';
 
-export default function HistoryScreen() {
-  const { history, removeHistoryItem } = useDocumentStore();
+export default function HistoryScreen({ navigation }: any) {
+  const { history, removeHistoryItem, setGemmaResult } = useDocumentStore();
 
   const docTypeMeta: Record<string, { label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; color: string }> = {
     NIVEDAN: { label: 'निवेदन', icon: 'file-document-outline', color: colors.primary },
@@ -26,6 +26,23 @@ export default function HistoryScreen() {
         },
       ]
     );
+  };
+
+  const handleEditDocument = (id: string) => {
+    const item = history.find((entry) => entry.id === id);
+    if (!item) return;
+
+    setGemmaResult({
+      ...item.result,
+      extractedFields: { ...item.result.extractedFields },
+      missingRequiredFields: [...(item.result.missingRequiredFields || [])],
+    });
+    const parentNavigation = navigation.getParent?.();
+    if (parentNavigation) {
+      parentNavigation.navigate('Document');
+    } else {
+      navigation.navigate('Document');
+    }
   };
 
   return (
@@ -96,15 +113,35 @@ export default function HistoryScreen() {
                   <Text style={styles.historyTranscript} numberOfLines={2}>
                     {item.transcript}
                   </Text>
-                  <Text style={styles.historyTimestamp}>
-                    {new Date(item.timestamp).toLocaleDateString('ne-NP', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </Text>
+                  <View style={styles.historyFooter}>
+                    <Text style={styles.historyTimestamp} numberOfLines={1}>
+                      {new Date(item.timestamp).toLocaleDateString('ne-NP', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                    <Pressable
+                      onPress={() => handleEditDocument(item.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel="इतिहासको दस्तावेज सम्पादन गर्नुहोस्"
+                      style={({ pressed }) => [
+                        styles.editButton,
+                        pressed && { transform: [{ scale: 0.96 }] },
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name="file-edit-outline"
+                        size={18}
+                        color={colors.govBlueDark}
+                      />
+                      <Text style={styles.editButtonText}>
+                        सम्पादन गर्नुहोस्
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
               );
             })}
@@ -218,7 +255,32 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   historyTimestamp: {
+    flex: 1,
     fontSize: 12,
     color: colors.outlineVariant,
+  },
+  historyFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  editButton: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: `${colors.govBlueDark}10`,
+    borderWidth: 1,
+    borderColor: `${colors.govBlueDark}26`,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  editButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.govBlueDark,
   },
 });
