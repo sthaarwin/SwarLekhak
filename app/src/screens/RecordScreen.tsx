@@ -413,8 +413,10 @@ export default function RecordScreen({ navigation }: any) {
             },
           ]}
         >
-          <Text variant="titleSmall" style={{ marginBottom: 4 }}>प्रश्न</Text>
-          <Text variant="bodyLarge">{gemmaResult.followUpQuestionNepali}</Text>
+          <View style={{ flexDirection: 'column', marginVertical: 4 }}>
+            <Text variant="titleSmall" style={{ marginBottom: 4 }}>प्रश्न:</Text>
+            <Text variant="bodyLarge">{gemmaResult.followUpQuestionNepali}</Text>
+          </View>
         </Banner>
       )}
 

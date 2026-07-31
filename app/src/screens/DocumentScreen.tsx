@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import NepaliDate from 'nepali-datetime';
 import { useDocumentStore } from '../store/useDocumentStore';
 import { exportDocumentPdf } from '../services/documentPdfService';
 import { colors, spacing, typeScale } from '../theme';
@@ -135,7 +136,7 @@ export default function DocumentScreen() {
               <Text style={styles.govSubtitle}>प्रशासनिक सेवा विभाग</Text>
             </View>
             <View>
-              {renderField('date', 'मिति', '२०८०/१०/२५')}
+              {renderField('date', 'मिति', (new NepaliDate() as any).format('YYYY/MM/DD', 'np'))}
             </View>
           </View>
 

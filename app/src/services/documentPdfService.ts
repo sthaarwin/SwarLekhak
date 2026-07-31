@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
+import NepaliDate from 'nepali-datetime';
 import { ExtractedFields } from '../types';
 
 const getField = (
@@ -22,7 +23,7 @@ export const buildDocumentHtml = (fields: ExtractedFields): string => {
   const address = escapeHtml(getField(fields, 'address', '...........................'));
   const wardNo = escapeHtml(getField(fields, 'wardNo', '---'));
   const subject = escapeHtml(getField(fields, 'subject', '...........................'));
-  const date = escapeHtml(getField(fields, 'date', '२०८०/१०/२५'));
+  const date = escapeHtml(getField(fields, 'date', (new NepaliDate() as any).format('YYYY/MM/DD', 'np')));
   const incidentDetails = escapeHtml(getField(fields, 'incidentDetails', ''));
 
   return `
@@ -152,16 +153,23 @@ export const buildDocumentHtml = (fields: ExtractedFields): string => {
 };
 
 export const exportDocumentPdf = async (fields: ExtractedFields) => {
-  const { uri } = await Print.printToFileAsync({ html: buildDocumentHtml(fields) });
-  const isAvailable = await Sharing.isAvailableAsync();
+  try {
+    const { uri } = await Print.printToFileAsync({ html: buildDocumentHtml(fields) });
+    const isAvailable = await Sharing.isAvailableAsync();
 
-  if (isAvailable) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: 'दस्तावेज PDF को रूपमा सेभ गर्नुहोस्',
-    });
-    return;
+    if (isAvailable) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        UTI: 'com.adobe.pdf',
+        dialogTitle: 'दस्तावेज PDF को रूपमा सेभ गर्नुहोस्',
+      });
+      return;
+    }
+
+    Alert.alert('PDF तयार', `PDF यहाँ सेभ भयो:\n${uri}`);
+  } catch (err: any) {
+    if (__DEV__) {
+      console.warn('PDF export or sharing cancelled/failed:', err);
+    }
   }
-
-  Alert.alert('PDF तयार', `PDF यहाँ सेभ भयो:\n${uri}`);
 };
