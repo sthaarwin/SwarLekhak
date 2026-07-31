@@ -3,6 +3,7 @@ import {
   View,
   StyleSheet,
   Animated,
+  ActivityIndicator,
   Easing,
   Pressable,
   ScrollView,
@@ -46,6 +47,7 @@ export default function RecordScreen({ navigation }: any) {
     setRawTranscript,
     setGemmaResult,
     setError,
+    error,
     addToHistory,
     addToConversationHistory,
     clearConversationHistory,
@@ -58,6 +60,9 @@ export default function RecordScreen({ navigation }: any) {
 
   const isRecording = recordingStatus === 'recording';
   const isPreview = recordingStatus === 'preview';
+  const isBusy = ['transcribing', 'translating', 'processing'].includes(recordingStatus);
+  const isEditing = recordingStatus === 'editing';
+  const needsTranslation = isEditing && !!transcript.trim() && !DEVANAGARI_RE.test(transcript);
 
   const animatePulse = useCallback(() => {
     Animated.loop(
@@ -232,6 +237,7 @@ export default function RecordScreen({ navigation }: any) {
     player.seekTo(0);
     if (!audioUri) return;
     try {
+      setError(null);
       setRecordingStatus('transcribing');
       setTranscript('');
       const transcription = await transcribeAudio(audioUri);
@@ -251,6 +257,7 @@ export default function RecordScreen({ navigation }: any) {
       return;
     }
     setRawTranscript(text);
+    setError(null);
     if (DEVANAGARI_RE.test(text)) {
       await processTranscription(text);
       return;
@@ -274,27 +281,57 @@ export default function RecordScreen({ navigation }: any) {
   const handleReRecord = () => {
     player.pause();
     player.seekTo(0);
+    setError(null);
     setAudioUri(null);
     setRecordingStatus('idle');
   };
 
   const statusText = isRecording
     ? 'रेकर्डिङ हुँदैछ...'
-    : recordingStatus === 'editing'
+    : isEditing
     ? 'पाठ सम्पादन गर्नुहोस्'
     : isPreview
     ? 'रेकर्डिङ तयार छ'
     : recordingStatus === 'transcribing'
-    ? 'लिप्यन्तरण हुँदै...'
+    ? 'आवाजबाट पाठ बनाउँदै...'
     : recordingStatus === 'translating'
-    ? 'नेपालीमा अनुवाद हुँदै...'
+    ? 'नेपालीमा अनुवाद गर्दै...'
     : recordingStatus === 'processing'
-    ? 'प्रशोधन हुँदै...'
+    ? 'दस्तावेज तयार गर्दै...'
     : clarifying
     ? 'जवाफ रेकर्ड गर्नुहोस्'
     : 'बोल्न सुरु गर्नुहोस्';
 
-  const statusColor = isRecording ? colors.error : recordingStatus === 'editing' ? colors.tertiary : isPreview ? colors.tertiary : clarifying ? colors.tertiary : colors.primary;
+  const statusHint = isRecording
+    ? 'काम सकिएपछि रोक्नुहोस्'
+    : isEditing
+    ? 'पाठ जाँचेर तलको बटन थिच्नुहोस्'
+    : isPreview
+    ? 'सुनेर पुष्टि गरेपछि पाठ देखिनेछ'
+    : isBusy
+    ? 'कृपया केही समय पर्खनुहोस्'
+    : clarifying
+    ? 'माथिको प्रश्नको जवाफ दिनुहोस्'
+    : 'तपाईंको आवाज प्रशासनिक दस्तावेजमा परिवर्तन हुनेछ।';
+
+  const statusColor = isRecording
+    ? colors.error
+    : isBusy
+    ? colors.feedbackInfo
+    : isEditing || isPreview || clarifying
+    ? colors.tertiary
+    : colors.primary;
+  const statusIcon = isRecording
+    ? 'record-circle-outline'
+    : isBusy
+    ? 'cog-sync-outline'
+    : isEditing
+    ? 'file-edit-outline'
+    : isPreview
+    ? 'check-circle-outline'
+    : clarifying
+    ? 'help-circle-outline'
+    : 'microphone-outline';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -302,7 +339,7 @@ export default function RecordScreen({ navigation }: any) {
       <View style={styles.glowBottom} pointerEvents="none" />
 
       {/* Template Carousel (hide during preview) */}
-      {!isPreview && (
+      {!isPreview && !isBusy && (
         <View style={styles.carouselSection}>
           <ScrollView
             horizontal
@@ -315,9 +352,11 @@ export default function RecordScreen({ navigation }: any) {
                 <Pressable
                   key={template.id}
                   onPress={() => setSelectedTemplate(template.id)}
+                  disabled={isRecording || isBusy || isEditing}
                   style={[
                     styles.templateChip,
                     isActive && { backgroundColor: template.color, borderColor: template.color },
+                    (isRecording || isBusy || isEditing) && styles.disabledControl,
                   ]}
                 >
                   <MaterialCommunityIcons
@@ -350,9 +389,16 @@ export default function RecordScreen({ navigation }: any) {
         </View>
       )}
 
+      {error && (
+        <View style={styles.errorBanner} accessibilityLiveRegion="polite">
+          <MaterialCommunityIcons name="alert-circle-outline" size={22} color={colors.error} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
       <View style={styles.content}>
         {/* Waveform */}
-        {!isPreview && (
+        {!isPreview && !isBusy && !isEditing && (
           <View style={styles.waveformContainer}>
             {waveAnims.map((anim, i) => (
               <Animated.View
@@ -379,10 +425,12 @@ export default function RecordScreen({ navigation }: any) {
           <View style={styles.previewSection}>
             <Pressable
               onPress={handlePlayPause}
+              disabled={recordingStatus !== 'preview'}
               accessibilityRole="button"
               accessibilityLabel={player.playing ? 'प्ले रोक्नुहोस्' : 'रेकर्डिङ सुन्नुहोस्'}
               style={({ pressed }) => [
                 styles.playButton,
+                recordingStatus !== 'preview' && styles.disabledButton,
                 pressed && { transform: [{ scale: 0.94 }] },
               ]}
             >
@@ -396,25 +444,29 @@ export default function RecordScreen({ navigation }: any) {
             <View style={styles.previewActions}>
               <Pressable
                 onPress={handleReRecord}
+                disabled={recordingStatus !== 'preview'}
                 accessibilityRole="button"
                 accessibilityLabel="पुन: रेकर्ड"
                 style={({ pressed }) => [
                   styles.previewActionBtn,
                   styles.previewActionReRecord,
+                  recordingStatus !== 'preview' && styles.disabledButton,
                   pressed && { transform: [{ scale: 0.96 }] },
                 ]}
               >
                 <MaterialCommunityIcons name="refresh" size={20} color={colors.error} />
-                <Text style={styles.previewActionLabel}>पुन: रेकर्ड</Text>
+                <Text style={[styles.previewActionLabel, styles.previewActionReRecordLabel]}>पुन: रेकर्ड</Text>
               </Pressable>
 
               <Pressable
                 onPress={handleConfirm}
+                disabled={recordingStatus !== 'preview'}
                 accessibilityRole="button"
                 accessibilityLabel="रेकर्डिङ पुष्टि गर्नुहोस्"
                 style={({ pressed }) => [
                   styles.previewActionBtn,
-                  styles.previewActionConfirm,
+                  styles.previewActionComplete,
+                  recordingStatus !== 'preview' && styles.disabledButton,
                   pressed && { transform: [{ scale: 0.96 }] },
                 ]}
               >
@@ -423,54 +475,63 @@ export default function RecordScreen({ navigation }: any) {
               </Pressable>
             </View>
           </View>
-        ) : recordingStatus === 'editing' || recordingStatus === 'transcribing' || recordingStatus === 'translating' ? (
+        ) : isEditing ? (
           <View style={styles.editingSection}>
             <TextInput
               multiline
               value={transcript}
               onChangeText={setTranscript}
               placeholder={
-                recordingStatus === 'transcribing'
-                  ? 'लिप्यन्तरण हुँदैछ...'
-                  : recordingStatus === 'translating'
-                  ? 'नेपालीमा अनुवाद गर्दैछ...'
-                  : 'पाठ सम्पादन गर्नुहोस्...'
+                  'पाठ सम्पादन गर्नुहोस्...'
               }
               style={styles.transcriptInput}
               textAlignVertical="top"
-              editable={recordingStatus === 'editing'}
+              editable={isEditing}
             />
             <View style={styles.previewActions}>
               <Pressable
                 onPress={handleReRecord}
+                disabled={!isEditing}
                 accessibilityRole="button"
                 accessibilityLabel="पुन: रेकर्ड"
                 style={({ pressed }) => [
                   styles.previewActionBtn,
                   styles.previewActionReRecord,
+                  !isEditing && styles.disabledButton,
                   pressed && { transform: [{ scale: 0.96 }] },
                 ]}
               >
                 <MaterialCommunityIcons name="refresh" size={20} color={colors.error} />
-                <Text style={styles.previewActionLabel}>पुन: रेकर्ड</Text>
+                <Text style={[styles.previewActionLabel, styles.previewActionReRecordLabel]}>पुन: रेकर्ड</Text>
               </Pressable>
 
               <Pressable
                 onPress={handleUseText}
+                disabled={!isEditing || !transcript.trim()}
                 accessibilityRole="button"
                 accessibilityLabel={DEVANAGARI_RE.test(transcript) ? 'पाठ प्रयोग गर्नुहोस्' : 'अनुवाद गर्नुहोस्'}
                 style={({ pressed }) => [
                   styles.previewActionBtn,
                   styles.previewActionConfirm,
+                  { backgroundColor: needsTranslation ? colors.accentWarm : colors.feedbackSuccess },
+                  (!isEditing || !transcript.trim()) && styles.disabledButton,
                   pressed && { transform: [{ scale: 0.96 }] },
                 ]}
               >
-                <MaterialCommunityIcons name="check" size={20} color="#fff" />
+                <MaterialCommunityIcons name={needsTranslation ? 'translate' : 'check'} size={20} color="#fff" />
                 <Text style={styles.previewActionLabel}>
-                  {DEVANAGARI_RE.test(transcript) ? 'प्रयोग गर्नुहोस्' : 'अनुवाद गर्नुहोस्'}
+                  {needsTranslation ? 'अनुवाद गर्नुहोस्' : 'प्रयोग गर्नुहोस्'}
                 </Text>
               </Pressable>
             </View>
+          </View>
+        ) : isBusy ? (
+          <View style={styles.busySection}>
+            <View style={[styles.busyIcon, { backgroundColor: `${statusColor}15` }]}>
+              <ActivityIndicator size="large" color={statusColor} />
+            </View>
+            <Text style={[styles.busyTitle, { color: statusColor }]}>{statusText}</Text>
+            <Text style={styles.busyText}>तपाईंको रेकर्डिङ सुरक्षित छ। यस स्क्रिनबाट बाहिर नजानुहोस्।</Text>
           </View>
         ) : (
           <>
@@ -498,6 +559,7 @@ export default function RecordScreen({ navigation }: any) {
               <Animated.View style={{ transform: [{ scale: micScale }] }}>
                 <Pressable
                   onPress={handleMicPress}
+                  disabled={isBusy}
                   accessibilityRole="button"
                   accessibilityLabel={isRecording ? 'रेकर्डिङ रोक्नुहोस्' : 'रेकर्डिङ सुरु गर्नुहोस्'}
                   style={({ pressed }) => [
@@ -506,6 +568,7 @@ export default function RecordScreen({ navigation }: any) {
                       backgroundColor: isRecording ? colors.error : colors.primary,
                       transform: [{ scale: pressed ? 0.95 : 1 }],
                     },
+                    isBusy && styles.disabledButton,
                   ]}
                 >
                   <MaterialCommunityIcons
@@ -520,28 +583,16 @@ export default function RecordScreen({ navigation }: any) {
         )}
 
         {/* Status Text */}
-        <View style={styles.statusSection}>
-          <Text
-            style={[
-              styles.statusText,
-              { color: statusColor },
-            ]}
-          >
-            {statusText}
-          </Text>
-          <Text style={styles.subtitle}>
-            {recordingStatus === 'editing'
-              ? 'पाठ सम्पादन गरेर प्रयोग गर्नुहोस्'
-              : isPreview
-              ? 'आफ्नो रेकर्डिङ सुन्नुहोस् र पुष्टि गर्नुहोस्'
-              : clarifying
-              ? 'माथिको प्रश्नको जवाफ दिनुहोस्'
-              : 'तपाईंको आवाज प्रशासनिक दस्तावेजमा परिवर्तन हुनेछ।'}
-          </Text>
-        </View>
+        {!isBusy && (
+          <View style={styles.statusSection}>
+            <MaterialCommunityIcons name={statusIcon} size={22} color={statusColor} />
+            <Text style={[styles.statusText, { color: statusColor }]}>{statusText}</Text>
+            <Text style={styles.subtitle}>{statusHint}</Text>
+          </View>
+        )}
 
         {/* Context Cards (hide during preview) */}
-        {!isPreview && (
+        {!isPreview && !isBusy && !isEditing && (
           <View style={styles.contextRow}>
             <View style={styles.contextCard}>
               <View
@@ -649,6 +700,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textMain,
   },
+  disabledControl: {
+    opacity: 0.45,
+  },
   clarificationBanner: {
     marginHorizontal: spacing.containerMargin,
     marginTop: 12,
@@ -670,6 +724,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textMain,
     lineHeight: 28,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: spacing.containerMargin,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: colors.errorContainer,
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 12,
+  },
+  errorText: {
+    flex: 1,
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -734,6 +806,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  disabledButton: {
+    opacity: 0.45,
   },
   previewActions: {
     flexDirection: 'row',
@@ -818,6 +893,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary,
+  },
+  busySection: {
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 24,
+  },
+  busyIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  busyTitle: {
+    ...typeScale.cardTitle,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  busyText: {
+    ...typeScale.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    maxWidth: 280,
   },
   editingSection: {
     alignSelf: 'stretch',
