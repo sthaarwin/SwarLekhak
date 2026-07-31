@@ -1,4 +1,4 @@
-export type DocumentType = 'NIVEDAN' | 'MEDICAL' | 'POLICE_REPORT';
+export type DocumentType = 'NIVEDAN' | 'UJURI' | 'SIFARIS' | 'SAMJHAUTA' | 'RAJINAMA';
 
 export type RecordingStatus = 'idle' | 'recording' | 'preview' | 'editing' | 'translating' | 'transcribing' | 'processing' | 'complete' | 'error';
 

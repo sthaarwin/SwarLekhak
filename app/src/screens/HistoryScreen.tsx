@@ -1,16 +1,33 @@
-import { View, StyleSheet, ScrollView, Alert, Pressable } from 'react-native';
-import { Text } from 'react-native-paper';
+import { useState } from 'react';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import {
+  Button,
+  Card,
+  Chip,
+  IconButton,
+  Surface,
+  Text,
+  useTheme,
+  Portal,
+  Modal,
+  Divider,
+} from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useDocumentStore } from '../store/useDocumentStore';
-import { colors, spacing, typeScale } from '../theme';
+import type { HistoryItem } from '../types';
+import { spacing } from '../theme';
 
 export default function HistoryScreen({ navigation }: any) {
+  const theme = useTheme();
   const { history, removeHistoryItem, setGemmaResult } = useDocumentStore();
+  const [previewItem, setPreviewItem] = useState<HistoryItem | null>(null);
 
-  const docTypeMeta: Record<string, { label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; color: string }> = {
-    NIVEDAN: { label: 'निवेदन', icon: 'file-document-outline', color: colors.primary },
-    MEDICAL: { label: 'स्वास्थ्य सिफारिस', icon: 'hospital-box-outline', color: colors.tertiary },
-    POLICE_REPORT: { label: 'प्रहरी उजुरी', icon: 'scale-balance', color: colors.secondary },
+  const docTypeMeta: Record<string, { label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }> = {
+    NIVEDAN: { label: 'निवेदन', icon: 'file-document-outline' },
+    UJURI: { label: 'उजुरी', icon: 'scale-balance' },
+    SIFARIS: { label: 'सिफारिस', icon: 'certificate-outline' },
+    SAMJHAUTA: { label: 'सम्झौता', icon: 'handshake-outline' },
+    RAJINAMA: { label: 'राजीनामा', icon: 'exit-to-app' },
   };
 
   const handleDelete = (id: string) => {
@@ -46,109 +63,131 @@ export default function HistoryScreen({ navigation }: any) {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <Surface style={styles.container} elevation={0}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>इतिहास</Text>
-          <Text style={styles.headerSubtitle}>
-            तपाईंले सिर्जना गर्नुभएका दस्तावेजहरू
-          </Text>
-        </View>
+        <Text variant="headlineMedium" style={{ color: theme.colors.primary, marginBottom: 4 }}>
+          इतिहास
+        </Text>
+        <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, marginBottom: spacing.lg }}>
+          तपाईंले सिर्जना गर्नुभएका दस्तावेजहरू
+        </Text>
 
         {history.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconBox}>
-              <MaterialCommunityIcons name="file-search-outline" size={34} color={colors.textMuted} />
-            </View>
-            <Text style={styles.emptyTitle}>अहिलेसम्म कुनै दस्तावेज छैन</Text>
-            <Text style={styles.emptyText}>
-              पहिलो दस्तावेज बनाउन तलको रेकर्ड ट्याबमा गएर बोल्नुहोस्।
-            </Text>
-          </View>
+          <Card mode="outlined" style={styles.emptyCard}>
+            <Card.Content style={styles.emptyContent}>
+              <IconButton icon="file-search-outline" size={40} iconColor={theme.colors.onSurfaceVariant} />
+              <Text variant="titleMedium" style={{ marginTop: 8 }}>अहिलेसम्म कुनै दस्तावेज छैन</Text>
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginTop: 4 }}>
+                पहिलो दस्तावेज बनाउन तलको रेकर्ड ट्याबमा गएर बोल्नुहोस्।
+              </Text>
+            </Card.Content>
+          </Card>
         ) : (
-          <View style={styles.historyList}>
-            {history.map((item) => {
-              const meta = docTypeMeta[item.result.documentType];
-              return (
-                <View key={item.id} style={styles.historyCard}>
-                  <View style={styles.historyCardHeader}>
-                    <View style={styles.historyCardLeft}>
-                      <View
-                        style={[
-                          styles.historyIconBox,
-                          { backgroundColor: `${meta?.color || colors.primary}14` },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name={meta?.icon || 'file-document-outline'}
-                          size={20}
-                          color={meta?.color || colors.primary}
-                        />
-                      </View>
-                      <Text style={styles.historyDocType}>
+          history.map((item) => {
+            const meta = docTypeMeta[item.result.documentType];
+            return (
+              <Surface key={item.id} elevation={0} style={[styles.historyCard, { backgroundColor: theme.colors.surfaceVariant }]}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardHeaderLeft}>
+                    <View style={[styles.iconWrapper, { backgroundColor: theme.colors.primaryContainer }]}>
+                      <MaterialCommunityIcons name={meta?.icon || 'file-document-outline'} size={24} color={theme.colors.primary} />
+                    </View>
+                    <View>
+                      <Text variant="titleMedium" style={{ fontWeight: '700', color: theme.colors.onSurface }}>
                         {meta?.label || item.result.documentType}
                       </Text>
-                    </View>
-                    <View style={styles.historyCardRight}>
-                      <Text style={styles.historyConfidence}>
-                        {(item.result.confidenceScore * 100).toFixed(0)}%
+                      <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                        {new Date(item.timestamp).toLocaleDateString('ne-NP', {
+                          year: 'numeric', month: 'long', day: 'numeric',
+                        })}
                       </Text>
-                      <Pressable
-                        onPress={() => handleDelete(item.id)}
-                        accessibilityRole="button"
-                        accessibilityLabel="इतिहासबाट मेटाउनुहोस्"
-                        hitSlop={8}
-                        style={({ pressed }) => [
-                          styles.deleteButton,
-                          pressed && { transform: [{ scale: 0.9 }] },
-                        ]}
-                      >
-                        <MaterialCommunityIcons name="delete-outline" size={20} color={colors.error} />
-                      </Pressable>
                     </View>
                   </View>
-                  <Text style={styles.historyTranscript} numberOfLines={2}>
-                    {item.transcript}
-                  </Text>
-                  <View style={styles.historyFooter}>
-                    <Text style={styles.historyTimestamp} numberOfLines={1}>
-                      {new Date(item.timestamp).toLocaleDateString('ne-NP', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
-                    <Pressable
-                      onPress={() => handleEditDocument(item.id)}
-                      accessibilityRole="button"
-                      accessibilityLabel="इतिहासको दस्तावेज सम्पादन गर्नुहोस्"
-                      style={({ pressed }) => [
-                        styles.editButton,
-                        pressed && { transform: [{ scale: 0.96 }] },
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name="file-edit-outline"
-                        size={18}
-                        color={colors.govBlueDark}
-                      />
-                      <Text style={styles.editButtonText}>
-                        सम्पादन गर्नुहोस्
-                      </Text>
-                    </Pressable>
+                  <View style={styles.cardHeaderRight}>
+                    <Chip compact mode="flat" style={{ backgroundColor: `${theme.colors.tertiary}18`, marginRight: 4 }}>
+                      {(item.result.confidenceScore * 100).toFixed(0)}%
+                    </Chip>
+                    <IconButton
+                      icon="eye-outline"
+                      iconColor={theme.colors.primary}
+                      size={20}
+                      style={{ margin: 0 }}
+                      onPress={() => setPreviewItem(item)}
+                    />
+                    <IconButton
+                      icon="delete-outline"
+                      iconColor={theme.colors.error}
+                      size={20}
+                      style={{ margin: 0 }}
+                      onPress={() => handleDelete(item.id)}
+                    />
                   </View>
                 </View>
-              );
-            })}
-          </View>
+                <View style={styles.cardBody}>
+                  <Text variant="bodyMedium" numberOfLines={2} style={{ color: theme.colors.onSurfaceVariant, flex: 1 }}>
+                    {item.transcript}
+                  </Text>
+                  <Button
+                    mode="contained"
+                    icon="file-edit-outline"
+                    compact
+                    onPress={() => handleEditDocument(item.id)}
+                    style={styles.editButton}
+                  >
+                    सम्पादन
+                  </Button>
+                </View>
+              </Surface>
+            );
+          })
         )}
       </ScrollView>
-    </View>
+
+      <Portal>
+        <Modal
+          visible={!!previewItem}
+          onDismiss={() => setPreviewItem(null)}
+          contentContainerStyle={styles.modalContent}
+        >
+          <View style={styles.modalHeader}>
+            <Text variant="titleLarge" style={{ color: theme.colors.primary, fontWeight: '700' }}>
+              {previewItem ? docTypeMeta[previewItem.result.documentType]?.label : ''} (पूर्वावलोकन)
+            </Text>
+          </View>
+          <Divider />
+          <ScrollView style={styles.modalScroll}>
+            <Text variant="labelMedium" style={{ color: theme.colors.primary, marginBottom: 4 }}>
+              रेकर्ड गरिएको पाठ:
+            </Text>
+            <Text variant="bodyLarge" style={{ color: theme.colors.onSurface, lineHeight: 28, marginBottom: 16 }}>
+              {previewItem?.transcript}
+            </Text>
+            <Text variant="labelMedium" style={{ color: theme.colors.tertiary, marginBottom: 4 }}>
+              निकालेका विवरणहरू:
+            </Text>
+            {previewItem && Object.entries(previewItem.result.extractedFields).map(([key, val]) => val ? (
+              <Text key={key} variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 2 }}>
+                - {key}: {val}
+              </Text>
+            ) : null)}
+          </ScrollView>
+          <Button
+            mode="contained"
+            onPress={() => {
+              const id = previewItem?.id;
+              setPreviewItem(null);
+              if (id) handleEditDocument(id);
+            }}
+            style={styles.modalButton}
+          >
+            सम्पादन गर्नुहोस्
+          </Button>
+        </Modal>
+      </Portal>
+    </Surface>
   );
 }
 
@@ -163,124 +202,64 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.containerMargin,
     paddingTop: spacing.sectionPadding,
     paddingBottom: 100,
-  },
-  header: {
-    marginBottom: spacing.stackGap * 2,
-  },
-  headerTitle: {
-    ...typeScale.pageTitle,
-    color: colors.govBlueDark,
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    ...typeScale.body,
-    color: colors.secondary,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: 60,
-  },
-  emptyIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.surfaceContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textMain,
-    marginBottom: 6,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: colors.textMuted,
-    textAlign: 'center',
-    maxWidth: 280,
-    lineHeight: 22,
-  },
-  historyList: {
     gap: 12,
+  },
+  emptyCard: {
+    marginTop: 40,
+  },
+  emptyContent: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
   },
   historyCard: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 20,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
   },
-  historyCardHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
-  historyCardLeft: {
+  cardHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.sm,
   },
-  historyCardRight: {
+  cardHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
-  historyIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  iconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  historyDocType: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textMain,
-  },
-  historyConfidence: {
-    fontSize: 14,
-    color: colors.tertiary,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  historyTranscript: {
-    fontSize: 14,
-    color: colors.textMuted,
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  historyTimestamp: {
-    flex: 1,
-    fontSize: 12,
-    color: colors.outlineVariant,
-  },
-  historyFooter: {
+  cardBody: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 8,
+    gap: spacing.md,
   },
   editButton: {
-    minHeight: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: `${colors.govBlueDark}10`,
-    borderWidth: 1,
-    borderColor: `${colors.govBlueDark}26`,
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    borderRadius: 16,
   },
-  editButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.govBlueDark,
+  modalContent: {
+    backgroundColor: '#ffffff',
+    margin: 20,
+    borderRadius: 16,
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    padding: spacing.lg,
+  },
+  modalScroll: {
+    padding: spacing.lg,
+  },
+  modalButton: {
+    margin: spacing.lg,
   },
 });

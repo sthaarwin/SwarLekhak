@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, CommonActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { Session } from '@supabase/supabase-js';
 import { StatusBar } from 'expo-status-bar';
-import { PaperProvider } from 'react-native-paper';
+import {
+  ActivityIndicator,
+  Appbar,
+  BottomNavigation,
+  PaperProvider,
+  Surface,
+  Text,
+  useTheme,
+} from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { View, StyleSheet, Text, Pressable } from 'react-native';
-import theme, { colors, spacing } from './src/theme';
+import { StyleSheet, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import theme from './src/theme';
 import RecordScreen from './src/screens/RecordScreen';
 import TemplatesScreen from './src/screens/TemplatesScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
@@ -25,93 +34,162 @@ const TAB_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = 
   History: 'history',
 };
 
-function TabBar({ state, descriptors, navigation: nav }: any) {
+function MaterialTabBar({ state, descriptors, navigation, insets }: any) {
+  const paperTheme = useTheme();
+
   return (
-    <View style={styles.tabBar}>
-      {state.routes.map((route: any, index: number) => {
-        const { options } = descriptors[route.key];
-        const isFocused = state.index === index;
-
-        const onPress = () => {
-          const event = nav.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!isFocused && !event.defaultPrevented) {
-            nav.navigate(route.name);
-          }
-        };
-
-        const tabIcon = TAB_ICONS[route.name];
-
+    <BottomNavigation.Bar
+      navigationState={state}
+      safeAreaInsets={insets}
+      activeColor={paperTheme.colors.primary}
+      inactiveColor={paperTheme.colors.onSurfaceVariant}
+      style={{ backgroundColor: paperTheme.colors.surface }}
+      onTabPress={({ route, preventDefault }) => {
+        const event = navigation.emit({
+          type: 'tabPress',
+          target: route.key,
+          canPreventDefault: true,
+        });
+        if (event.defaultPrevented) {
+          preventDefault();
+        } else {
+          navigation.dispatch(
+            CommonActions.navigate(route.name, route.params)
+          );
+        }
+      }}
+      renderIcon={({ route, focused, color }) => {
+        const iconName = TAB_ICONS[route.name];
         return (
-          <Pressable
-            key={route.key}
-            onPress={onPress}
-            accessibilityRole="tab"
-            accessibilityState={isFocused ? { selected: true } : {}}
-            style={({ pressed }) => [
-              styles.tabItem,
-              isFocused && styles.tabItemActive,
-              pressed && { transform: [{ scale: 0.94 }] },
-            ]}
-          >
-            <MaterialCommunityIcons
-              name={tabIcon}
-              size={22}
-              color={isFocused ? colors.primary : colors.textMuted}
-            />
-            <Text
-              style={[styles.tabLabel, isFocused && styles.tabLabelActive]}
-            >
-              {route.name}
-            </Text>
-          </Pressable>
+          <MaterialCommunityIcons
+            name={iconName}
+            size={24}
+            color={color}
+          />
         );
-      })}
-    </View>
+      }}
+      getLabelText={({ route }) => {
+        const { options } = descriptors[route.key];
+        return (options.tabBarLabel ?? options.title ?? route.name) as string;
+      }}
+    />
   );
 }
 
-function TopBar({ session, navigation, userName }: { session: Session; navigation: any; userName: string | null }) {
+function TopBar({
+  session,
+  navigation,
+  userName,
+}: {
+  session: Session;
+  navigation: any;
+  userName: string | null;
+}) {
+  const paperTheme = useTheme();
   const displayValue = userName || session.user.email || 'User';
-  const initial = (userName || session.user.email || 'U').slice(0, 1).toUpperCase();
 
   return (
-    <View style={styles.topBar}>
-      <View style={styles.topBarLeft}>
-        <MaterialCommunityIcons name="seal" size={26} color={colors.govBlueDark} />
-        <Text style={styles.topBarTitle}>Swar-Lekhak</Text>
-      </View>
-      <Pressable
-        onPress={() => {
-          console.log('Navigating to Profile...');
-          navigation.navigate('Profile');
-        }}
-        style={styles.accountButton}
-      >
-        <Text style={styles.accountEmail} numberOfLines={1}>
+    <Appbar.Header elevated mode="small">
+      <Appbar.Content
+        title="Swar-Lekhak"
+        titleStyle={styles.appBarTitle}
+      />
+      <View style={styles.accountRow}>
+        <Text
+          variant="labelMedium"
+          numberOfLines={1}
+          style={{ color: paperTheme.colors.onSurfaceVariant, maxWidth: 120 }}
+        >
           {displayValue}
         </Text>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarIcon}>{initial}</Text>
-        </View>
-      </Pressable>
-    </View>
+        <Appbar.Action
+          icon="account-circle"
+          onPress={() => navigation.navigate('Profile')}
+          accessibilityLabel="प्रोफाइल"
+        />
+      </View>
+    </Appbar.Header>
   );
 }
 
-function HomeTabs({ session, navigation, userName }: { session: Session; navigation: any; userName: string | null }) {
+function HomeTabs({
+  session,
+  navigation,
+  userName,
+}: {
+  session: Session;
+  navigation: any;
+  userName: string | null;
+}) {
+  const paperTheme = useTheme();
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <Surface style={{ flex: 1 }} elevation={0}>
       <TopBar session={session} navigation={navigation} userName={userName} />
-      <Tab.Navigator tabBar={(props) => <TabBar {...props} />}>
-        <Tab.Screen name="Record" component={RecordScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Templates" component={TemplatesScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="History" component={HistoryScreen} options={{ headerShown: false }} />
+      <Tab.Navigator tabBar={(props) => <MaterialTabBar {...props} />}>
+        <Tab.Screen
+          name="Record"
+          component={RecordScreen}
+          options={{ headerShown: false, title: 'Record' }}
+        />
+        <Tab.Screen
+          name="Templates"
+          component={TemplatesScreen}
+          options={{ headerShown: false, title: 'Templates' }}
+        />
+        <Tab.Screen
+          name="History"
+          component={HistoryScreen}
+          options={{ headerShown: false, title: 'History' }}
+        />
       </Tab.Navigator>
-    </View>
+    </Surface>
+  );
+}
+
+function LoadingScreen() {
+  const paperTheme = useTheme();
+
+  return (
+    <Surface style={styles.loadingScreen} elevation={0}>
+      <ActivityIndicator size="large" color={paperTheme.colors.primary} />
+      <Text variant="headlineSmall" style={{ color: paperTheme.colors.primary, marginTop: 16 }}>
+        Swar-Lekhak
+      </Text>
+    </Surface>
+  );
+}
+
+function AppNavigator({ session, userName }: { session: Session; userName: string | null }) {
+  const paperTheme = useTheme();
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: paperTheme.colors.surface },
+          headerTintColor: paperTheme.colors.primary,
+          headerShadowVisible: false,
+          headerTitleStyle: { fontWeight: '600' },
+        }}
+      >
+        <Stack.Screen name="Home" options={{ headerShown: false }}>
+          {({ navigation }) => (
+            <HomeTabs session={session} navigation={navigation} userName={userName} />
+          )}
+        </Stack.Screen>
+        <Stack.Screen
+          name="Document"
+          component={DocumentScreen}
+          options={{ headerTitle: 'दस्तावेज' }}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{ headerTitle: 'प्रोफाइल' }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
 
@@ -162,143 +240,35 @@ export default function App() {
     }
   }
 
-  const handleSignOut = () => {
-    supabase.auth.signOut();
-  };
-
   return (
-    <PaperProvider theme={theme}>
-      <StatusBar hidden />
-      {initializing ? (
-        <View style={styles.loadingScreen}>
-          <Text style={styles.loadingText}>Swar-Lekhak</Text>
-        </View>
-      ) : session ? (
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Home">
-              {({ navigation }) => <HomeTabs session={session} navigation={navigation} userName={userName} />}
-            </Stack.Screen>
-            <Stack.Screen
-              name="Document"
-              component={DocumentScreen}
-              options={{
-                headerShown: true,
-                headerTitle: 'दस्तावेज',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.primary,
-                headerShadowVisible: false,
-              }}
-            />
-            <Stack.Screen
-              name="Profile"
-              component={ProfileScreen}
-              options={{
-                headerShown: true,
-                headerTitle: 'Profile',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.primary,
-                headerShadowVisible: false,
-              }}
-            />
-          </Stack.Navigator>
-        </NavigationContainer>
-      ) : (
-        <LoginScreen />
-      )}
-    </PaperProvider>
+    <SafeAreaProvider>
+      <PaperProvider theme={theme}>
+        <StatusBar style="dark" />
+        {initializing ? (
+          <LoadingScreen />
+        ) : session ? (
+          <AppNavigator session={session} userName={userName} />
+        ) : (
+          <LoginScreen />
+        )}
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    height: 64,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle,
-  },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  topBarTitle: {
-    fontSize: 22,
+  appBarTitle: {
     fontWeight: '700',
-    color: colors.govBlueDark,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.secondaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  avatarIcon: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  accountButton: {
+  accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    maxWidth: '55%',
-  },
-  accountEmail: {
-    color: colors.onSurfaceVariant,
-    flexShrink: 1,
-    fontSize: 13,
-    fontWeight: '600',
+    gap: 4,
+    marginRight: 4,
   },
   loadingScreen: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-  loadingText: {
-    color: colors.govBlueDark,
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    height: 80,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-  },
-  tabItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 24,
-  },
-  tabItemActive: {
-    backgroundColor: colors.secondaryContainer,
-    paddingHorizontal: 16,
-  },
-  tabLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    color: colors.secondary,
-    marginTop: 4,
-  },
-  tabLabelActive: {
-    color: colors.primary,
   },
 });

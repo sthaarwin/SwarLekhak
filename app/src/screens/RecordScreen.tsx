@@ -3,32 +3,44 @@ import {
   View,
   StyleSheet,
   Animated,
-  ActivityIndicator,
   Easing,
-  Pressable,
   ScrollView,
 } from 'react-native';
-import { Text, TextInput } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  ActivityIndicator,
+  Banner,
+  Button,
+  Card,
+  Chip,
+  FAB,
+  IconButton,
+  Surface,
+  Text,
+  TextInput,
+  useTheme,
+} from 'react-native-paper';
 import { useAudioPlayer } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import { useDocumentStore } from '../store/useDocumentStore';
 import { transcribeAudio } from '../services/sttService';
 import { analyzeWithGemma, translateTranscript } from '../services/gemmaService';
 import { startRecording, stopRecording, requestRecordPermission } from '../services/wavRecorderService';
-import { colors, spacing, typeScale } from '../theme';
+import { colors, spacing } from '../theme';
 import type { DocumentType } from '../types';
 
 const BAR_COUNT = 32;
 const DEVANAGARI_RE = /[\u0900-\u097F]/;
-const TEMPLATES: { id: DocumentType | 'AUTO'; title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; color: string }[] = [
-  { id: 'AUTO', title: 'स्वचालित', icon: 'auto-fix', color: colors.primary },
-  { id: 'NIVEDAN', title: 'निवेदन', icon: 'file-document-outline', color: colors.govBlueDark },
-  { id: 'MEDICAL', title: 'स्वास्थ्य', icon: 'hospital-box-outline', color: colors.tertiary },
-  { id: 'POLICE_REPORT', title: 'प्रहरी उजुरी', icon: 'scale-balance', color: colors.secondary },
+const TEMPLATES: { id: DocumentType | 'AUTO'; title: string; icon: string }[] = [
+  { id: 'AUTO', title: 'स्वचालित', icon: 'auto-fix' },
+  { id: 'NIVEDAN', title: 'निवेदन', icon: 'file-document-outline' },
+  { id: 'UJURI', title: 'उजुरी', icon: 'scale-balance' },
+  { id: 'SIFARIS', title: 'सिफारिस', icon: 'certificate-outline' },
+  { id: 'SAMJHAUTA', title: 'सम्झौता', icon: 'handshake-outline' },
+  { id: 'RAJINAMA', title: 'राजीनामा', icon: 'exit-to-app' },
 ];
 
 export default function RecordScreen({ navigation }: any) {
+  const theme = useTheme();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const waveAnims = useRef(
     Array.from({ length: BAR_COUNT }, () => new Animated.Value(0.15))
@@ -89,9 +101,7 @@ export default function RecordScreen({ navigation }: any) {
     if (waveInterval.current) clearInterval(waveInterval.current);
     waveInterval.current = setInterval(() => {
       waveAnims.forEach((anim) => {
-        const val = isRecording
-          ? Math.random() * 0.85 + 0.15
-          : 0.15;
+        const val = isRecording ? Math.random() * 0.85 + 0.15 : 0.15;
         Animated.timing(anim, {
           toValue: val,
           duration: 100,
@@ -351,30 +361,15 @@ export default function RecordScreen({ navigation }: any) {
     : 'तपाईंको आवाज प्रशासनिक दस्तावेजमा परिवर्तन हुनेछ।';
 
   const statusColor = isRecording
-    ? colors.error
+    ? theme.colors.error
     : isBusy
     ? colors.feedbackInfo
     : isEditing || isPreview || clarifying
-    ? colors.tertiary
-    : colors.primary;
-  const statusIcon = isRecording
-    ? 'record-circle-outline'
-    : isBusy
-    ? 'cog-sync-outline'
-    : isEditing
-    ? 'file-edit-outline'
-    : isPreview
-    ? 'check-circle-outline'
-    : clarifying
-    ? 'help-circle-outline'
-    : 'microphone-outline';
+    ? theme.colors.tertiary
+    : theme.colors.primary;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* <View style={styles.glowTop} pointerEvents="none" />
-      <View style={styles.glowBottom} pointerEvents="none" /> */}
-
-      {/* Template Carousel (hide during preview) */}
+    <Surface style={styles.container} elevation={0}>
       {!isPreview && !isBusy && (
         <View style={styles.carouselSection}>
           <ScrollView
@@ -382,82 +377,59 @@ export default function RecordScreen({ navigation }: any) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.carouselContent}
           >
-            {TEMPLATES.map((template) => {
-              const isActive = selectedTemplate === template.id;
-              return (
-                <Pressable
-                  key={template.id}
-                  onPress={() => setSelectedTemplate(template.id)}
-                  disabled={isRecording || isBusy || isEditing}
-                  style={[
-                    styles.templateChip,
-                    isActive && { backgroundColor: template.color, borderColor: template.color },
-                    (isRecording || isBusy || isEditing) && styles.disabledControl,
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={template.icon}
-                    size={16}
-                    color={isActive ? '#fff' : template.color}
-                  />
-                  <Text
-                    style={[
-                      styles.templateChipLabel,
-                      isActive && { color: '#fff' },
-                    ]}
-                  >
-                    {template.title}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            {TEMPLATES.map((template) => (
+              <Chip
+                key={template.id}
+                selected={selectedTemplate === template.id}
+                icon={template.icon}
+                onPress={() => setSelectedTemplate(template.id)}
+                disabled={isRecording || isBusy || isEditing}
+                mode={selectedTemplate === template.id ? 'flat' : 'outlined'}
+                showSelectedOverlay
+                style={styles.templateChip}
+              >
+                {template.title}
+              </Chip>
+            ))}
           </ScrollView>
         </View>
       )}
 
-      {/* Clarification Banner */}
       {clarifying && gemmaResult?.followUpQuestionNepali && (
-        <View style={styles.clarificationBanner}>
-          <View style={styles.clarificationHeader}>
-            <Text style={styles.clarificationLabel}>प्रश्न:</Text>
-            <Pressable
-              onPress={() => {
+        <Banner
+          visible
+          icon="help-circle-outline"
+          style={styles.banner}
+          actions={[
+            {
+              label: speakingFollowUp ? 'रोक्नुहोस्' : 'सुन्नुहोस्',
+              onPress: () => {
                 if (speakingFollowUp) {
                   stopFollowUpSpeech();
                 } else {
                   speakFollowUp(followUpQuestion);
                 }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={speakingFollowUp ? 'प्रश्न सुनाउन रोक्नुहोस्' : 'प्रश्न सुन्नुहोस्'}
-              style={({ pressed }) => [
-                styles.speechButton,
-                speakingFollowUp && styles.speechButtonActive,
-                pressed && { transform: [{ scale: 0.94 }] },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name={speakingFollowUp ? 'volume-off' : 'volume-high'}
-                size={18}
-                color={speakingFollowUp ? '#fff' : colors.tertiary}
-              />
-            </Pressable>
-          </View>
-          <Text style={styles.clarificationText}>
-            {gemmaResult.followUpQuestionNepali}
-          </Text>
-        </View>
+              },
+            },
+          ]}
+        >
+          <Text variant="titleSmall" style={{ marginBottom: 4 }}>प्रश्न</Text>
+          <Text variant="bodyLarge">{gemmaResult.followUpQuestionNepali}</Text>
+        </Banner>
       )}
 
-      {error && (
-        <View style={styles.errorBanner} accessibilityLiveRegion="polite">
-          <MaterialCommunityIcons name="alert-circle-outline" size={22} color={colors.error} />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
+      {!!error && (
+        <Banner
+          visible
+          icon="alert-circle-outline"
+          style={styles.errorBanner}
+          actions={[]}
+        >
+          {error}
+        </Banner>
       )}
 
       <View style={styles.content}>
-        {/* Waveform */}
         {!isPreview && !isBusy && !isEditing && (
           <View style={styles.waveformContainer}>
             {waveAnims.map((anim, i) => (
@@ -468,7 +440,7 @@ export default function RecordScreen({ navigation }: any) {
                   {
                     backgroundColor: isRecording
                       ? `rgba(0, 63, 135, ${0.2 + (i / BAR_COUNT) * 0.8})`
-                      : `${colors.primary}20`,
+                      : `${theme.colors.primary}33`,
                     height: anim.interpolate({
                       inputRange: [0, 1],
                       outputRange: ['8%', '100%'],
@@ -480,59 +452,36 @@ export default function RecordScreen({ navigation }: any) {
           </View>
         )}
 
-        {/* Preview UI */}
         {isPreview ? (
-          <View style={styles.previewSection}>
-            <Pressable
+          <View style={styles.actionSection}>
+            <FAB
+              icon={player.playing ? 'pause' : 'play'}
               onPress={handlePlayPause}
               disabled={recordingStatus !== 'preview'}
-              accessibilityRole="button"
-              accessibilityLabel={player.playing ? 'प्ले रोक्नुहोस्' : 'रेकर्डिङ सुन्नुहोस्'}
-              style={({ pressed }) => [
-                styles.playButton,
-                recordingStatus !== 'preview' && styles.disabledButton,
-                pressed && { transform: [{ scale: 0.94 }] },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name={player.playing ? 'pause' : 'play'}
-                size={40}
-                color="#fff"
-              />
-            </Pressable>
-
-            <View style={styles.previewActions}>
-              <Pressable
+              color={theme.colors.primary}
+              customSize={80}
+              style={styles.fab}
+            />
+            <View style={styles.buttonRow}>
+              <Button
+                mode="outlined"
+                icon="refresh"
                 onPress={handleReRecord}
                 disabled={recordingStatus !== 'preview'}
-                accessibilityRole="button"
-                accessibilityLabel="पुन: रेकर्ड"
-                style={({ pressed }) => [
-                  styles.previewActionBtn,
-                  styles.previewActionReRecord,
-                  recordingStatus !== 'preview' && styles.disabledButton,
-                  pressed && { transform: [{ scale: 0.96 }] },
-                ]}
+                textColor={theme.colors.error}
+                style={styles.halfButton}
               >
-                <MaterialCommunityIcons name="refresh" size={20} color={colors.error} />
-                <Text style={[styles.previewActionLabel, styles.previewActionReRecordLabel]}>पुन: रेकर्ड</Text>
-              </Pressable>
-
-              <Pressable
+                पुन: रेकर्ड
+              </Button>
+              <Button
+                mode="contained"
+                icon="check"
                 onPress={handleConfirm}
                 disabled={recordingStatus !== 'preview'}
-                accessibilityRole="button"
-                accessibilityLabel="रेकर्डिङ पुष्टि गर्नुहोस्"
-                style={({ pressed }) => [
-                  styles.previewActionBtn,
-                  styles.previewActionComplete,
-                  recordingStatus !== 'preview' && styles.disabledButton,
-                  pressed && { transform: [{ scale: 0.96 }] },
-                ]}
+                style={styles.halfButton}
               >
-                <MaterialCommunityIcons name="check" size={20} color="#fff" />
-                <Text style={styles.previewActionLabel}>पुष्टि गर्नुहोस्</Text>
-              </Pressable>
+                पुष्टि गर्नुहोस्
+              </Button>
             </View>
           </View>
         ) : isEditing ? (
@@ -541,155 +490,152 @@ export default function RecordScreen({ navigation }: any) {
               multiline
               value={transcript}
               onChangeText={setTranscript}
-              placeholder={
-                  'पाठ सम्पादन गर्नुहोस्...'
-              }
+              placeholder="पाठ सम्पादन गर्नुहोस्..."
+              mode="outlined"
               style={styles.transcriptInput}
               textAlignVertical="top"
               editable={isEditing}
             />
-            <View style={styles.previewActions}>
-              <Pressable
+            <View style={styles.buttonRow}>
+              <Button
+                mode="outlined"
+                icon="refresh"
                 onPress={handleReRecord}
                 disabled={!isEditing}
-                accessibilityRole="button"
-                accessibilityLabel="पुन: रेकर्ड"
-                style={({ pressed }) => [
-                  styles.previewActionBtn,
-                  styles.previewActionReRecord,
-                  !isEditing && styles.disabledButton,
-                  pressed && { transform: [{ scale: 0.96 }] },
-                ]}
+                textColor={theme.colors.error}
+                style={styles.halfButton}
               >
-                <MaterialCommunityIcons name="refresh" size={20} color={colors.error} />
-                <Text style={[styles.previewActionLabel, styles.previewActionReRecordLabel]}>पुन: रेकर्ड</Text>
-              </Pressable>
-
-              <Pressable
+                पुन: रेकर्ड
+              </Button>
+              <Button
+                mode="contained"
+                icon={needsTranslation ? 'translate' : 'check'}
                 onPress={handleUseText}
                 disabled={!isEditing || !transcript.trim()}
-                accessibilityRole="button"
-                accessibilityLabel={DEVANAGARI_RE.test(transcript) ? 'पाठ प्रयोग गर्नुहोस्' : 'अनुवाद गर्नुहोस्'}
-                style={({ pressed }) => [
-                  styles.previewActionBtn,
-                  styles.previewActionConfirm,
-                  { backgroundColor: needsTranslation ? colors.accentWarm : colors.feedbackSuccess },
-                  (!isEditing || !transcript.trim()) && styles.disabledButton,
-                  pressed && { transform: [{ scale: 0.96 }] },
-                ]}
+                buttonColor={needsTranslation ? colors.accentWarm : colors.feedbackSuccess}
+                style={styles.halfButton}
               >
-                <MaterialCommunityIcons name={needsTranslation ? 'translate' : 'check'} size={20} color="#fff" />
-                <Text style={styles.previewActionLabel}>
-                  {needsTranslation ? 'अनुवाद गर्नुहोस्' : 'प्रयोग गर्नुहोस्'}
-                </Text>
-              </Pressable>
+                {needsTranslation ? 'अनुवाद गर्नुहोस्' : 'प्रयोग गर्नुहोस्'}
+              </Button>
             </View>
           </View>
         ) : isBusy ? (
           <View style={styles.busySection}>
-            <View style={[styles.busyIcon, { backgroundColor: `${statusColor}15` }]}>
+            <Surface style={[styles.busyIcon, { backgroundColor: `${statusColor}18` }]} elevation={1}>
               <ActivityIndicator size="large" color={statusColor} />
-            </View>
-            <Text style={[styles.busyTitle, { color: statusColor }]}>{statusText}</Text>
-            <Text style={styles.busyText}>तपाईंको रेकर्डिङ सुरक्षित छ। यस स्क्रिनबाट बाहिर नजानुहोस्।</Text>
+            </Surface>
+            <Text variant="titleLarge" style={{ color: statusColor, textAlign: 'center' }}>
+              {statusText}
+            </Text>
+            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginTop: 8 }}>
+              तपाईंको रेकर्डिङ सुरक्षित छ। यस स्क्रिनबाट बाहिर नजानुहोस्।
+            </Text>
           </View>
         ) : (
-          <>
-            {/* Mic Button with Pulse Rings */}
-            <View style={styles.micSection}>
-              <Animated.View
-                style={[
-                  styles.pulseRing,
-                  {
-                    transform: [{ scale: pulseScale }],
-                    opacity: pulseOpacity,
-                  },
-                ]}
+          <View style={styles.micSection}>
+            <Animated.View
+              style={[
+                styles.pulseRing,
+                {
+                  transform: [{ scale: pulseScale }],
+                  opacity: pulseOpacity,
+                  backgroundColor: `${theme.colors.primary}33`,
+                },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.pulseRing,
+                styles.pulseRingSecond,
+                {
+                  transform: [{ scale: pulseScale }],
+                  opacity: pulseOpacity,
+                  backgroundColor: `${theme.colors.primary}18`,
+                },
+              ]}
+            />
+            <Animated.View style={{ transform: [{ scale: micScale }] }}>
+              <FAB
+                icon={isRecording ? 'stop' : 'microphone'}
+                onPress={handleMicPress}
+                disabled={isBusy}
+                color={isRecording ? theme.colors.error : theme.colors.primary}
+                customSize={80}
+                style={styles.fab}
               />
-              <Animated.View
-                style={[
-                  styles.pulseRing,
-                  styles.pulseRingSecond,
-                  {
-                    transform: [{ scale: pulseScale }],
-                    opacity: pulseOpacity,
-                  },
-                ]}
-              />
-              <Animated.View style={{ transform: [{ scale: micScale }] }}>
-                <Pressable
-                  onPress={handleMicPress}
-                  disabled={isBusy}
-                  accessibilityRole="button"
-                  accessibilityLabel={isRecording ? 'रेकर्डिङ रोक्नुहोस्' : 'रेकर्डिङ सुरु गर्नुहोस्'}
-                  style={({ pressed }) => [
-                    styles.micButton,
-                    {
-                      backgroundColor: isRecording ? colors.error : colors.primary,
-                      transform: [{ scale: pressed ? 0.95 : 1 }],
-                    },
-                    isBusy && styles.disabledButton,
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={isRecording ? 'stop' : 'microphone'}
-                    size={48}
-                    color="#fff"
-                  />
-                </Pressable>
-              </Animated.View>
-            </View>
-          </>
+            </Animated.View>
+          </View>
         )}
 
-        {/* Status Text */}
         {!isBusy && (
           <View style={styles.statusSection}>
-            <MaterialCommunityIcons name={statusIcon} size={22} color={statusColor} />
-            <Text style={[styles.statusText, { color: statusColor }]}>{statusText}</Text>
-            <Text style={styles.subtitle}>{statusHint}</Text>
+            <Chip
+              icon={
+                isRecording ? 'record-circle-outline'
+                : isEditing ? 'file-edit-outline'
+                : isPreview ? 'check-circle-outline'
+                : clarifying ? 'help-circle-outline'
+                : 'microphone-outline'
+              }
+              mode="flat"
+              style={{ backgroundColor: `${statusColor}18` }}
+              textStyle={{ color: statusColor, fontWeight: '600' }}
+            >
+              {statusText}
+            </Chip>
+            <Text
+              variant="bodyMedium"
+              style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginTop: 8 }}
+            >
+              {statusHint}
+            </Text>
           </View>
         )}
 
-        {/* Context Cards (hide during preview) */}
         {!isPreview && !isBusy && !isEditing && (
           <View style={styles.contextRow}>
-            <View style={styles.contextCard}>
-              <View
-                style={[
-                  styles.contextIconBox,
-                  { backgroundColor: `${colors.tertiary}10` },
-                ]}
-              >
-                <MaterialCommunityIcons name="translate" size={20} color={colors.tertiary} />
+            <Surface 
+              elevation={0}
+              style={[
+                styles.contextCardMain,
+                { backgroundColor: theme.colors.tertiaryContainer }
+              ]}
+            >
+              <View style={styles.contextCardInner}>
+                <View style={[styles.contextIconWrapper, { backgroundColor: '#ffffff66' }]}>
+                  <IconButton icon="translate" size={20} iconColor={theme.colors.tertiary} style={styles.contextIcon} />
+                </View>
+                <View style={styles.contextTextColumn}>
+                  <Text variant="labelSmall" style={{ color: theme.colors.tertiary, opacity: 0.85 }}>भाषा</Text>
+                  <Text variant="titleMedium" style={{ color: theme.colors.onTertiaryContainer, fontWeight: '700' }}>नेपाली</Text>
+                </View>
               </View>
-              <View>
-                <Text style={styles.contextLabel}>LANGUAGE</Text>
-                <Text style={styles.contextValue}>नेपाली (NP)</Text>
+            </Surface>
+            <Surface 
+              elevation={0} 
+              style={[
+                styles.contextCardMain,
+                { backgroundColor: theme.colors.primaryContainer }
+              ]}
+            >
+              <View style={styles.contextCardInner}>
+                <View style={[styles.contextIconWrapper, { backgroundColor: '#ffffff66' }]}>
+                  <IconButton icon="file-document-outline" size={20} iconColor={theme.colors.primary} style={styles.contextIcon} />
+                </View>
+                <View style={styles.contextTextColumn}>
+                  <Text variant="labelSmall" style={{ color: theme.colors.primary, opacity: 0.85 }}>टेम्प्लेट</Text>
+                  <Text variant="titleMedium" numberOfLines={1} style={{ color: theme.colors.onPrimaryContainer, fontWeight: '700' }}>
+                    {TEMPLATES.find((t) => t.id === selectedTemplate)?.title || 'स्वचालित'}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <View style={styles.contextCard}>
-              <View
-                style={[
-                  styles.contextIconBox,
-                  { backgroundColor: `${colors.primary}10` },
-                ]}
-              >
-                <MaterialCommunityIcons name="file-document-outline" size={20} color={colors.primary} />
-              </View>
-              <View>
-                <Text style={styles.contextLabel}>TEMPLATE</Text>
-                <Text style={styles.contextValue}>
-                  {TEMPLATES.find((t) => t.id === selectedTemplate)?.title || 'स्वचालित'}
-                </Text>
-              </View>
-            </View>
+            </Surface>
           </View>
         )}
 
-        {/* Skip clarification */}
         {clarifying && (
-          <Pressable
+          <Button
+            mode="text"
             onPress={async () => {
               stopFollowUpSpeech();
               setClarifying(false);
@@ -700,18 +646,13 @@ export default function RecordScreen({ navigation }: any) {
                 navigation.navigate('Document');
               }
             }}
-            style={({ pressed }) => [
-              styles.skipButton,
-              pressed && { opacity: 0.7 },
-            ]}
+            style={styles.skipButton}
           >
-            <Text style={styles.skipButtonText}>
-              अझै पनि दस्तावेज हेर्नुहोस् →
-            </Text>
-          </Pressable>
+            अझै पनि दस्तावेज हेर्नुहोस् →
+          </Button>
         )}
       </View>
-    </View>
+    </Surface>
   );
 }
 
@@ -719,109 +660,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  glowTop: {
-    position: 'absolute',
-    top: -90,
-    alignSelf: 'center',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: `${colors.primary}12`,
-  },
-  glowBottom: {
-    position: 'absolute',
-    bottom: -110,
-    alignSelf: 'center',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: `${colors.tertiary}0F`,
-  },
   carouselSection: {
-    paddingTop: spacing.sectionPadding,
-    paddingBottom: 8,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   carouselContent: {
     paddingHorizontal: spacing.containerMargin,
-    gap: 10,
+    gap: spacing.sm,
   },
   templateChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.surfaceContainerLowest,
+    marginRight: 4,
   },
-  templateChipLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textMain,
-  },
-  disabledControl: {
-    opacity: 0.45,
-  },
-  clarificationBanner: {
+  banner: {
     marginHorizontal: spacing.containerMargin,
-    marginTop: 12,
-    padding: 14,
-    backgroundColor: `${colors.tertiary}10`,
-    borderWidth: 1,
-    borderColor: colors.tertiary,
-    borderRadius: 12,
-  },
-  clarificationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 4,
-  },
-  clarificationLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.tertiary,
-    textTransform: 'uppercase',
-  },
-  speechButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.tertiary,
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  speechButtonActive: {
-    backgroundColor: colors.tertiary,
-  },
-  clarificationText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.textMain,
-    lineHeight: 28,
+    marginTop: spacing.sm,
   },
   errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     marginHorizontal: spacing.containerMargin,
-    marginTop: 12,
-    padding: 12,
+    marginTop: spacing.sm,
     backgroundColor: colors.errorContainer,
-    borderWidth: 1,
-    borderColor: colors.error,
-    borderRadius: 12,
-  },
-  errorText: {
-    flex: 1,
-    color: colors.error,
-    fontSize: 14,
-    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -834,156 +691,90 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
     gap: 3,
-    height: 128,
+    height: 100,
     width: '100%',
     maxWidth: 320,
-    marginBottom: 40,
+    marginBottom: spacing.lg,
   },
   waveformBar: {
-    width: 5,
-    borderRadius: 3,
+    width: 4,
+    borderRadius: 2,
   },
   micSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 32,
+    marginBottom: spacing.lg,
+    height: 120,
   },
   pulseRing: {
     position: 'absolute',
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    backgroundColor: `${colors.primary}33`,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
-  pulseRingSecond: {
-    backgroundColor: `${colors.primary}1A`,
+  pulseRingSecond: {},
+  fab: {
+    borderRadius: 40,
   },
-  micButton: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
+  actionSection: {
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    marginBottom: spacing.lg,
+    gap: spacing.md,
   },
-  previewSection: {    alignItems: 'center',
-    marginBottom: 32,
-  },
-  playButton: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  disabledButton: {
-    opacity: 0.45,
-  },
-  previewActions: {
+  buttonRow: {
     flexDirection: 'row',
-    gap: 16,
+    gap: spacing.sm,
+    width: '100%',
+    maxWidth: 360,
   },
-  previewActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-  },
-  previewActionReRecord: {
-    backgroundColor: `${colors.error}20`,
-    borderWidth: 1,
-    borderColor: colors.error,
-  },
-  previewActionReRecordLabel: {
-    color: colors.error,
-  },
-  previewActionComplete: {
-    backgroundColor: colors.primary,
-  },
-  previewActionConfirm: {
-    backgroundColor: colors.primary,
-  },
-  previewActionLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
+  halfButton: {
+    flex: 1,
   },
   statusSection: {
     alignItems: 'center',
-    marginBottom: 48,
-  },
-  statusText: {
-    ...typeScale.sectionTitle,
-    marginBottom: 8,
-  },
-  subtitle: {
-    ...typeScale.body,
-    color: colors.textMuted,
-    textAlign: 'center',
-    maxWidth: 280,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   contextRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
     width: '100%',
     maxWidth: 400,
+    marginTop: spacing.sm,
   },
-  contextCard: {
+  contextCardMain: {
     flex: 1,
+    borderRadius: 24,
+  },
+  contextCardInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: 12,
-    padding: 14,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    gap: 8,
   },
-  contextIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+  contextIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 4,
   },
-  contextLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    color: colors.textMuted,
+  contextIcon: {
+    margin: 0,
   },
-  contextValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textMain,
+  contextTextColumn: {
+    flex: 1,
+    justifyContent: 'center',
   },
   skipButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  skipButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
+    marginTop: spacing.sm,
   },
   busySection: {
     alignItems: 'center',
-    marginBottom: 32,
-    paddingHorizontal: 24,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   busyIcon: {
     width: 88,
@@ -991,27 +782,15 @@ const styles = StyleSheet.create({
     borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
-  },
-  busyTitle: {
-    ...typeScale.cardTitle,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  busyText: {
-    ...typeScale.body,
-    color: colors.textMuted,
-    textAlign: 'center',
-    maxWidth: 280,
+    marginBottom: spacing.md,
   },
   editingSection: {
     alignSelf: 'stretch',
-    marginBottom: 32,
+    marginBottom: spacing.lg,
+    gap: spacing.md,
   },
   transcriptInput: {
-    backgroundColor: colors.surface,
-    minHeight: 160,
-    marginBottom: 16,
-    fontSize: 16,
+    minHeight: 180,
+    backgroundColor: 'transparent',
   },
 });

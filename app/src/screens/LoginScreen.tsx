@@ -2,15 +2,23 @@ import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
-import { Button, Text, TextInput } from 'react-native-paper';
+import {
+  Button,
+  Card,
+  SegmentedButtons,
+  Surface,
+  Text,
+  TextInput,
+  useTheme,
+} from 'react-native-paper';
 import { supabase } from '../services/supabaseClient';
-import { borderRadius, colors, spacing } from '../theme';
+import { spacing } from '../theme';
 
 export default function LoginScreen() {
+  const theme = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -59,8 +67,6 @@ export default function LoginScreen() {
 
         if (profileError) {
           console.error('Error creating profile:', profileError);
-          // We don't necessarily block the sign-up if profile creation fails,
-          // as the auth user was already created.
         }
       }
     } else {
@@ -83,152 +89,117 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.container}
-    >
-      <View style={styles.panel}>
-        <View style={styles.brandBlock}>
-          <Text style={styles.brand}>Swar-Lekhak</Text>
-          <Text style={styles.title}>
-            {isSignUp ? 'नयाँ खाता खोल्नुहोस्' : 'जारी राख्न साइन इन गर्नुहोस्'}
-          </Text>
-        </View>
-
-        <View style={styles.segmented}>
-          <Pressable
-            onPress={() => {
-              setMode('sign-in');
-              setError(null);
-              setMessage(null);
-            }}
-            style={[styles.segment, !isSignUp && styles.segmentActive]}
-          >
-            <Text style={[styles.segmentText, !isSignUp && styles.segmentTextActive]}>
-              साइन इन
+    <Surface style={styles.container} elevation={0}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardView}
+      >
+        <Card mode="elevated" elevation={2} style={styles.card}>
+          <Card.Content style={styles.cardContent}>
+            <Text variant="headlineMedium" style={{ color: theme.colors.primary, fontWeight: '800' }}>
+              Swar-Lekhak
             </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setMode('sign-up');
-              setError(null);
-              setMessage(null);
-            }}
-            style={[styles.segment, isSignUp && styles.segmentActive]}
-          >
-            <Text style={[styles.segmentText, isSignUp && styles.segmentTextActive]}>
-              खाता खोल्नुहोस्
+            <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, marginBottom: spacing.md }}>
+              {isSignUp ? 'नयाँ खाता खोल्नुहोस्' : 'जारी राख्न साइन इन गर्नुहोस्'}
             </Text>
-          </Pressable>
-        </View>
 
-        <View style={styles.form}>
-          {isSignUp && (
-            <TextInput
-              label="पूरा नाम"
-              mode="outlined"
-              onChangeText={setFullName}
-              value={fullName}
+            <SegmentedButtons
+              value={mode}
+              onValueChange={(value) => {
+                setMode(value as 'sign-in' | 'sign-up');
+                setError(null);
+                setMessage(null);
+              }}
+              buttons={[
+                { value: 'sign-in', label: 'साइन इन', icon: 'login' },
+                { value: 'sign-up', label: 'खाता खोल्नुहोस्', icon: 'account-plus' },
+              ]}
+              style={styles.segmented}
             />
-          )}
-          <TextInput
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            label="इमेल"
-            mode="outlined"
-            onChangeText={setEmail}
-            value={email}
-          />
-          <TextInput
-            autoCapitalize="none"
-            label="पासवर्ड"
-            mode="outlined"
-            onChangeText={setPassword}
-            secureTextEntry
-            value={password}
-          />
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          {message ? <Text style={styles.messageText}>{message}</Text> : null}
+            <View style={styles.form}>
+              {isSignUp && (
+                <TextInput
+                  label="पूरा नाम"
+                  mode="outlined"
+                  onChangeText={setFullName}
+                  value={fullName}
+                />
+              )}
+              <TextInput
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                label="इमेल"
+                mode="outlined"
+                onChangeText={setEmail}
+                value={email}
+                left={<TextInput.Icon icon="email-outline" />}
+              />
+              <TextInput
+                autoCapitalize="none"
+                label="पासवर्ड"
+                mode="outlined"
+                onChangeText={setPassword}
+                secureTextEntry
+                value={password}
+                left={<TextInput.Icon icon="lock-outline" />}
+              />
 
-          <Button
-            disabled={loading}
-            loading={loading}
-            mode="contained"
-            onPress={handleSubmit}
-            style={styles.submit}
-          >
-            {isSignUp ? 'खाता खोल्नुहोस्' : 'साइन इन'}
-          </Button>
-        </View>
-      </View>
-    </KeyboardAvoidingView>
+              {error ? (
+                <Text variant="bodySmall" style={{ color: theme.colors.error }}>{error}</Text>
+              ) : null}
+              {message ? (
+                <Text variant="bodySmall" style={{ color: theme.colors.tertiary }}>{message}</Text>
+              ) : null}
+
+              <Button
+                disabled={loading}
+                loading={loading}
+                mode="contained"
+                onPress={handleSubmit}
+                style={styles.submit}
+                contentStyle={styles.submitContent}
+              >
+                {isSignUp ? 'खाता खोल्नुहोस्' : 'साइन इन'}
+              </Button>
+            </View>
+          </Card.Content>
+        </Card>
+      </KeyboardAvoidingView>
+    </Surface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  keyboardView: {
+    flex: 1,
     justifyContent: 'center',
-    backgroundColor: colors.background,
     padding: spacing.containerMargin,
   },
-  panel: {
-    width: '100%',
+  card: {
     maxWidth: 440,
+    width: '100%',
     alignSelf: 'center',
-    gap: spacing.stackGap,
   },
-  brandBlock: {
-    gap: 6,
-  },
-  brand: {
-    color: colors.govBlueDark,
-    fontSize: 30,
-    fontWeight: '800',
-  },
-  title: {
-    color: colors.onSurfaceVariant,
-    fontSize: 16,
+  cardContent: {
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
   },
   segmented: {
-    flexDirection: 'row',
-    padding: 4,
-    borderRadius: borderRadius.xl,
-    backgroundColor: colors.surfaceContainer,
-  },
-  segment: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-    borderRadius: borderRadius.lg,
-  },
-  segmentActive: {
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  segmentText: {
-    color: colors.onSurfaceVariant,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  segmentTextActive: {
-    color: colors.primary,
+    marginBottom: spacing.sm,
   },
   form: {
     gap: 12,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 13,
-  },
-  messageText: {
-    color: colors.tertiary,
-    fontSize: 13,
+    marginTop: spacing.sm,
   },
   submit: {
-    borderRadius: borderRadius.xl,
     marginTop: 4,
+  },
+  submitContent: {
+    paddingVertical: 4,
   },
 });

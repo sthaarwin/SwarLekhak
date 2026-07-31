@@ -1,18 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { TextInput, Button, Text, Divider } from 'react-native-paper';
-import { colors, spacing } from '../theme';
+import { StyleSheet, ScrollView, Alert } from 'react-native';
+import {
+  ActivityIndicator,
+  Button,
+  Card,
+  Divider,
+  Surface,
+  Text,
+  TextInput,
+  useTheme,
+} from 'react-native-paper';
+import { spacing } from '../theme';
 import { supabase } from '../services/supabaseClient';
-import { UserProfile } from '../types';
 
 export default function ProfileScreen({ navigation }: any) {
+  const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
 
   useEffect(() => {
-    console.log('ProfileScreen mounted');
     fetchProfile();
   }, []);
 
@@ -30,7 +38,7 @@ export default function ProfileScreen({ navigation }: any) {
         .eq('id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows found"
+      if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
@@ -78,93 +86,81 @@ export default function ProfileScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <Text>प्रोफाइल लोड हुँदैछ...</Text>
-      </View>
+      <Surface style={styles.centered} elevation={0}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text variant="bodyLarge" style={{ marginTop: 12 }}>प्रोफाइल लोड हुँदैछ...</Text>
+      </Surface>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>प्रोफाइल</Text>
-
-        <View style={styles.section}>
-          <TextInput
-            label="इमेल"
-            value={email}
-            editable={false}
-            style={styles.input}
-            mode="outlined"
-          />
-          <TextInput
-            label="पूरा नाम"
-            value={fullName}
-            onChangeText={setFullName}
-            style={styles.input}
-            mode="outlined"
-          />
-        </View>
-
-        <Button
-          mode="contained"
-          onPress={handleSave}
-          loading={saving}
-          style={styles.saveButton}
-        >
-          प्रोफाइल सेभ गर्नुहोस्
-        </Button>
+    <Surface style={styles.container} elevation={0}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Card mode="elevated" elevation={1}>
+          <Card.Content style={styles.form}>
+            <TextInput
+              label="इमेल"
+              value={email}
+              editable={false}
+              mode="outlined"
+              left={<TextInput.Icon icon="email-outline" />}
+            />
+            <TextInput
+              label="पूरा नाम"
+              value={fullName}
+              onChangeText={setFullName}
+              mode="outlined"
+              left={<TextInput.Icon icon="account-outline" />}
+            />
+            <Button
+              mode="contained"
+              icon="content-save"
+              onPress={handleSave}
+              loading={saving}
+              style={styles.saveButton}
+            >
+              प्रोफाइल सेभ गर्नुहोस्
+            </Button>
+          </Card.Content>
+        </Card>
 
         <Divider style={styles.divider} />
 
         <Button
           mode="text"
+          icon="logout"
           onPress={handleSignOut}
-          textColor={colors.error}
+          textColor={theme.colors.error}
           style={styles.signOutButton}
         >
           साइन आउट
         </Button>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </Surface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
   },
   content: {
     padding: spacing.containerMargin,
-    paddingTop: 60,
+    paddingTop: spacing.md,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.govBlueDark,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  section: {
+  form: {
     gap: 16,
-    marginBottom: 24,
-  },
-  input: {
-    backgroundColor: colors.surface,
   },
   saveButton: {
     marginTop: 8,
-    paddingVertical: 4,
   },
   divider: {
-    marginVertical: 32,
+    marginVertical: spacing.lg,
   },
   signOutButton: {
     alignSelf: 'center',

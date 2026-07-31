@@ -50,12 +50,17 @@ export default function DocumentScreen() {
     );
   }
 
-  const docTypeLabel =
-    gemmaResult.documentType === 'NIVEDAN'
-      ? 'प्रशासनिक पत्र'
-      : gemmaResult.documentType === 'MEDICAL'
-      ? 'स्वास्थ्य सिफारिस'
-      : 'प्रहरी उजुरी';
+  const getDocLabel = (type: string) => {
+    switch (type) {
+      case 'NIVEDAN': return 'निवेदन';
+      case 'UJURI': return 'उजुरी';
+      case 'SIFARIS': return 'सिफारिस';
+      case 'SAMJHAUTA': return 'सम्झौता';
+      case 'RAJINAMA': return 'राजीनामा';
+      default: return 'कागजात';
+    }
+  };
+  const docTypeLabel = getDocLabel(gemmaResult.documentType);
 
   const getField = (key: string, fallback: string = '...........................') =>
     editableFields[key] || fallback;
@@ -154,7 +159,7 @@ export default function DocumentScreen() {
             {renderField('address', 'ठेगाना')}
             {renderField('wardNo', 'वडा नम्बर')}
 
-            {gemmaResult.documentType === 'POLICE_REPORT' && (
+            {gemmaResult.documentType === 'UJURI' && (
               <>
                 {renderField('incidentDetails', 'घटना विवरण')}
               </>

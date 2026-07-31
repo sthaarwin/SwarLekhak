@@ -1,4 +1,5 @@
 import { MD3LightTheme, configureFonts } from 'react-native-paper';
+import type { MD3Theme } from 'react-native-paper';
 
 const govBlueDark = '#003366';
 const primary = '#003f87';
@@ -11,10 +12,10 @@ const surfaceContainerHighest = '#e1e3e4';
 const surfaceContainerLowest = '#ffffff';
 const onSurface = '#191c1d';
 const onSurfaceVariant = '#424752';
-const secondary = '#5b5f62';
+const secondary = '#565f71';
 const secondaryContainer = '#dde0e3';
 const tertiary = '#004c17';
-const tertiaryContainer = '#006722';
+const tertiaryContainer = '#d7f0dc';
 const tertiaryFixed = '#d7f0dc';
 const outline = '#727784';
 const outlineVariant = '#c2c6d4';
@@ -99,40 +100,71 @@ export const typeScale = {
   caption: { fontSize: 12, fontWeight: '500' as const, lineHeight: 16 },
 };
 
-const theme = {
+const fontConfig = configureFonts({
+  config: {
+    displayLarge: { fontFamily: 'System', fontWeight: '400', fontSize: 57, lineHeight: 64, letterSpacing: -0.25 },
+    displayMedium: { fontFamily: 'System', fontWeight: '400', fontSize: 45, lineHeight: 52, letterSpacing: 0 },
+    displaySmall: { fontFamily: 'System', fontWeight: '400', fontSize: 36, lineHeight: 44, letterSpacing: 0 },
+    headlineLarge: { fontFamily: 'System', fontWeight: '400', fontSize: 32, lineHeight: 40, letterSpacing: 0 },
+    headlineMedium: { fontFamily: 'System', fontWeight: '400', fontSize: 28, lineHeight: 36, letterSpacing: 0 },
+    headlineSmall: { fontFamily: 'System', fontWeight: '400', fontSize: 24, lineHeight: 32, letterSpacing: 0 },
+    titleLarge: { fontFamily: 'System', fontWeight: '500', fontSize: 22, lineHeight: 28, letterSpacing: 0 },
+    titleMedium: { fontFamily: 'System', fontWeight: '500', fontSize: 16, lineHeight: 24, letterSpacing: 0.15 },
+    titleSmall: { fontFamily: 'System', fontWeight: '500', fontSize: 14, lineHeight: 20, letterSpacing: 0.1 },
+    labelLarge: { fontFamily: 'System', fontWeight: '500', fontSize: 14, lineHeight: 20, letterSpacing: 0.1 },
+    labelMedium: { fontFamily: 'System', fontWeight: '500', fontSize: 12, lineHeight: 16, letterSpacing: 0.5 },
+    labelSmall: { fontFamily: 'System', fontWeight: '500', fontSize: 11, lineHeight: 16, letterSpacing: 0.5 },
+    bodyLarge: { fontFamily: 'System', fontWeight: '400', fontSize: 16, lineHeight: 24, letterSpacing: 0.5 },
+    bodyMedium: { fontFamily: 'System', fontWeight: '400', fontSize: 14, lineHeight: 20, letterSpacing: 0.25 },
+    bodySmall: { fontFamily: 'System', fontWeight: '400', fontSize: 12, lineHeight: 16, letterSpacing: 0.4 },
+  },
+});
+
+const theme: MD3Theme = {
   ...MD3LightTheme,
+  fonts: fontConfig,
+  roundness: 12,
   colors: {
     ...MD3LightTheme.colors,
-    primary: colors.primary,
-    onPrimary: colors.onPrimary,
-    primaryContainer: colors.primary,
-    secondary: colors.secondary,
-    onSecondary: colors.onSecondary,
-    secondaryContainer: colors.secondaryContainer,
-    tertiary: colors.tertiary,
-    onTertiary: colors.onTertiary,
-    tertiaryContainer: colors.tertiaryContainer,
-    background: colors.background,
-    onBackground: colors.onSurface,
-    surface: colors.surface,
-    onSurface: colors.onSurface,
-    surfaceVariant: colors.surfaceContainer,
-    onSurfaceVariant: colors.onSurfaceVariant,
-    outline: colors.outline,
-    outlineVariant: colors.outlineVariant,
-    error: colors.error,
+    primary,
+    onPrimary: '#ffffff',
+    primaryContainer: '#d7e2ff',
+    onPrimaryContainer: '#001435',
+    secondary,
+    onSecondary: '#ffffff',
+    secondaryContainer,
+    onSecondaryContainer: '#131c2b',
+    tertiary,
+    onTertiary: '#ffffff',
+    tertiaryContainer,
+    onTertiaryContainer: '#002108',
+    error,
     onError: '#ffffff',
-    errorContainer: colors.errorContainer,
+    errorContainer,
+    onErrorContainer: '#410002',
+    background,
+    onBackground: onSurface,
+    surface,
+    onSurface,
+    surfaceVariant: surfaceContainer,
+    onSurfaceVariant,
+    outline,
+    outlineVariant,
+    inverseSurface: colors.inverseSurface,
+    inverseOnSurface: colors.inverseOnSurface,
+    inversePrimary: colors.inversePrimary,
     elevation: {
       level0: 'transparent',
-      level1: colors.surfaceContainerLow,
-      level2: colors.surfaceContainer,
-      level3: colors.surfaceContainerHigh,
-      level4: colors.surfaceContainerHighest,
-      level5: colors.surfaceContainerHighest,
+      level1: surfaceContainerLow,
+      level2: surfaceContainer,
+      level3: surfaceContainerHigh,
+      level4: surfaceContainerHighest,
+      level5: surfaceContainerHighest,
     },
+    surfaceDisabled: 'rgba(25, 28, 29, 0.12)',
+    onSurfaceDisabled: 'rgba(25, 28, 29, 0.38)',
+    backdrop: 'rgba(25, 28, 29, 0.4)',
   },
-  roundness: 8,
 };
 
 export default theme;

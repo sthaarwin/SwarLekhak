@@ -36,7 +36,7 @@ function buildUserPrompt(
 ${conversationContext}Latest user input: "${rawTranscript}"${templateHint}
 
 Tasks:
-1. Detect Document Type: NIVEDAN, MEDICAL, or POLICE_REPORT${selectedTemplate && selectedTemplate !== 'AUTO' ? ` (user selected: ${selectedTemplate})` : ''}.
+1. Detect Document Type: NIVEDAN, UJURI, SIFARIS, SAMJHAUTA, or RAJINAMA${selectedTemplate && selectedTemplate !== 'AUTO' ? ` (user selected: ${selectedTemplate})` : ''}.
 2. Extract available entities (Name, Address, Ward Number, Subject, Incident details, Dates).
 3. The "Latest user input" may be the user's ANSWER to the Assistant's previous question. Use it to fill the field that was previously missing. Carry forward every field already present in "Previous conversation" into the output extractedFields.
 4. Identify crucial missing information still required for an official government application. Do NOT list a field as missing if its value already appears in the conversation.
