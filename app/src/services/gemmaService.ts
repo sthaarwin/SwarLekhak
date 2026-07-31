@@ -8,7 +8,11 @@ import {
   OLLAMA_MODEL,
 } from '../config';
 
-const SYSTEM_PROMPT = `You are Swar-Lekhak, an AI administrative assistant for Nepal. You convert spoken Nepali into structured government documents. Always respond with valid JSON only, no markdown, no code fences.`;
+const SYSTEM_PROMPT = `You are Swar-Lekhak, an AI administrative assistant for Nepal. You convert spoken or typed Nepali into structured government documents. Always respond with valid JSON only, no markdown, no code fences.
+
+The user input may be in Devanagari (नेपाली), romanized/transliterated Nepali (e.g. "ujuri" = उजुरी/complaint, "nibedan" = निवेदन/application, "polis" = प्रहरी/police), or plain English. Understand the meaning regardless of script and map administrative concepts correctly.
+
+NAMES AND PROPER NOUNS: Never translate, transliterate, or modify personal names, place names, or organization names. Preserve them exactly as the user wrote or spoke them (e.g. "Arbin", "अर्बिन", "Ramesh" stay as-is). If a name appears in romanized form, keep it romanized; if in Devanagari, keep it Devanagari. Only translate common words and administrative terms.`;
 
 function buildUserPrompt(
   rawTranscript: string,
@@ -114,7 +118,13 @@ function parseGemmaResponse(text: string): GemmaAnalysisResult {
   return JSON.parse(jsonMatch[0]) as GemmaAnalysisResult;
 }
 
-async function callOpenRouter(userPrompt: string): Promise<GemmaAnalysisResult> {
+const TRANSLATE_PROMPT = `You are Swar-Lekhak, an AI administrative assistant for Nepal. Translate the user's message into clean, natural Nepali in Devanagari script (नेपाली). The input may be romanized Nepali, Devanagari, or English. 
+
+NAMES AND PROPER NOUNS: Never translate, transliterate, or modify personal names, place names, or organization names. Preserve them exactly as written or spoken (e.g. "Arbin", "अर्बिन", "Ramesh" stay as-is). Only translate the surrounding common words.
+
+Output only the translated Nepali text. No quotes, no JSON, no explanations.`;
+
+async function callOpenRouterText(systemPrompt: string, userPrompt: string): Promise<string> {
   const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -126,7 +136,7 @@ async function callOpenRouter(userPrompt: string): Promise<GemmaAnalysisResult> 
     body: JSON.stringify({
       model: OPENROUTER_MODEL,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.2,
@@ -142,17 +152,17 @@ async function callOpenRouter(userPrompt: string): Promise<GemmaAnalysisResult> 
   const data = await response.json();
   const text = data.choices?.[0]?.message?.content || '';
   if (!text) throw new Error('OpenRouter returned empty response');
-  return parseGemmaResponse(text);
+  return text;
 }
 
-async function callOllama(userPrompt: string): Promise<GemmaAnalysisResult> {
+async function callOllamaText(systemPrompt: string, userPrompt: string): Promise<string> {
   const response = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: OLLAMA_MODEL,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.2,
@@ -169,7 +179,57 @@ async function callOllama(userPrompt: string): Promise<GemmaAnalysisResult> {
   const data = await response.json();
   const text = data.choices?.[0]?.message?.content || '';
   if (!text) throw new Error('Ollama returned empty response');
-  return parseGemmaResponse(text);
+  return text;
+}
+
+async function callOpenRouter(userPrompt: string): Promise<GemmaAnalysisResult> {
+  return parseGemmaResponse(await callOpenRouterText(SYSTEM_PROMPT, userPrompt));
+}
+
+async function callOllama(userPrompt: string): Promise<GemmaAnalysisResult> {
+  return parseGemmaResponse(await callOllamaText(SYSTEM_PROMPT, userPrompt));
+}
+
+function buildProviders<T>(primaryCall: () => Promise<T>, secondaryCall: () => Promise<T>): { name: string; call: () => Promise<T> }[] {
+  const providers: { name: string; call: () => Promise<T> }[] = [];
+  const push = (name: string, call: () => Promise<T>) => {
+    if (name === 'openrouter' && !OPENROUTER_API_KEY) return;
+    providers.push({ name, call });
+  };
+  if (MODEL_PROVIDER === 'ollama') {
+    push('Ollama', primaryCall);
+    push('OpenRouter', secondaryCall);
+  } else {
+    push('OpenRouter', primaryCall);
+    push('Ollama', secondaryCall);
+  }
+  return providers;
+}
+
+async function runWithFallback<T>(providers: { name: string; call: () => Promise<T> }[]): Promise<T> {
+  let lastError: unknown = null;
+  for (const provider of providers) {
+    try {
+      console.log(`[Gemma] Trying ${provider.name}...`);
+      const result = await provider.call();
+      console.log(`[Gemma] ${provider.name} succeeded`);
+      return result;
+    } catch (error) {
+      lastError = error;
+      console.warn(`[Gemma] ${provider.name} failed:`, error);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('All providers failed');
+}
+
+export async function translateTranscript(rawTranscript: string): Promise<string> {
+  console.log('[Gemma] Translating:', rawTranscript.substring(0, 50));
+  const providers = buildProviders(
+    () => callOpenRouterText(TRANSLATE_PROMPT, rawTranscript),
+    () => callOllamaText(TRANSLATE_PROMPT, rawTranscript)
+  );
+  const text = await runWithFallback(providers);
+  return text.trim();
 }
 
 export async function analyzeWithGemma(
@@ -180,38 +240,17 @@ export async function analyzeWithGemma(
   const userPrompt = buildUserPrompt(rawTranscript, conversationHistory, selectedTemplate);
   console.log('[Gemma] Analyzing:', rawTranscript.substring(0, 50));
 
-  const primary = MODEL_PROVIDER === 'ollama' ? 'ollama' : 'openrouter';
-  const secondary = primary === 'ollama' ? 'openrouter' : 'ollama';
+  const providers = buildProviders(
+    () => callOpenRouter(userPrompt),
+    () => callOllama(userPrompt)
+  );
 
-  const providers: { name: string; call: () => Promise<GemmaAnalysisResult> }[] = [];
-
-  if (primary === 'openrouter' && OPENROUTER_API_KEY) {
-    providers.push({ name: 'OpenRouter', call: () => callOpenRouter(userPrompt) });
+  try {
+    return await runWithFallback(providers);
+  } catch (error) {
+    console.warn('[Gemma] All providers failed, falling back to demo');
+    return getDemoResult(rawTranscript);
   }
-  if (primary === 'ollama') {
-    providers.push({ name: 'Ollama', call: () => callOllama(userPrompt) });
-  }
-
-  if (secondary === 'openrouter' && OPENROUTER_API_KEY) {
-    providers.push({ name: 'OpenRouter', call: () => callOpenRouter(userPrompt) });
-  }
-  if (secondary === 'ollama') {
-    providers.push({ name: 'Ollama', call: () => callOllama(userPrompt) });
-  }
-
-  for (const provider of providers) {
-    try {
-      console.log(`[Gemma] Trying ${provider.name}...`);
-      const result = await provider.call();
-      console.log(`[Gemma] ${provider.name} succeeded`);
-      return result;
-    } catch (error) {
-      console.warn(`[Gemma] ${provider.name} failed:`, error);
-    }
-  }
-
-  console.warn('[Gemma] All providers failed, falling back to demo');
-  return getDemoResult(rawTranscript);
 }
 
 export { getDemoResult };

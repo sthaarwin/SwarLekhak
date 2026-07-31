@@ -8,13 +8,15 @@ import {
   ScrollView,
 } from 'react-native';
 import { Text } from 'react-native-paper';
+import { TextInput } from 'react-native-paper';
 import { useAudioPlayer } from 'expo-audio';
 import { useDocumentStore } from '../store/useDocumentStore';
 import { transcribeAudio } from '../services/sttService';
-import { analyzeWithGemma } from '../services/gemmaService';
+import { analyzeWithGemma, translateTranscript } from '../services/gemmaService';
 import { startRecording, stopRecording, requestRecordPermission } from '../services/wavRecorderService';
+import { STT_PROVIDER } from '../config';
 import { colors, spacing } from '../theme';
-import type { DocumentType } from '../types';
+import type { DocumentType, SttModel } from '../types';
 
 const BAR_COUNT = 32;
 const TEMPLATES: { id: DocumentType | 'AUTO'; title: string; icon: string; color: string }[] = [
@@ -22,6 +24,12 @@ const TEMPLATES: { id: DocumentType | 'AUTO'; title: string; icon: string; color
   { id: 'NIVEDAN', title: 'निवेदन', icon: '📄', color: colors.govBlueDark },
   { id: 'MEDICAL', title: 'स्वास्थ्य', icon: '🏥', color: colors.tertiary },
   { id: 'POLICE_REPORT', title: 'प्रहरी उजुरी', icon: '⚖️', color: colors.secondary },
+];
+
+const STT_MODELS: { id: SttModel; label: string; hint: string }[] = [
+  { id: 'tiny', label: '⚡ छिटो', hint: 'छिटो, कम सटीक' },
+  { id: 'base', label: 'मध्यम', hint: 'सन्तुलित' },
+  { id: 'small', label: '🐢 राम्रो', hint: 'ढिलो, राम्रो STT' },
 ];
 
 export default function RecordScreen({ navigation }: any) {
@@ -33,7 +41,11 @@ export default function RecordScreen({ navigation }: any) {
   const [micScale] = useState(() => new Animated.Value(1));
   const [clarifying, setClarifying] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const [translatedText, setTranslatedText] = useState('');
+  const [isEditingTranslation, setIsEditingTranslation] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
+  const processingRef = useRef(false);
   const player = useAudioPlayer(null);
 
   const log = useCallback((msg: string) => {
@@ -55,6 +67,8 @@ export default function RecordScreen({ navigation }: any) {
     rawTranscript,
     selectedTemplate,
     setSelectedTemplate,
+    sttModel,
+    setSttModel,
     conversationHistory,
   } = useDocumentStore();
 
@@ -144,6 +158,8 @@ export default function RecordScreen({ navigation }: any) {
   });
 
   const processTranscription = async (transcript: string) => {
+    if (processingRef.current) return;
+    processingRef.current = true;
     try {
       setRecordingStatus('processing');
       const result = await analyzeWithGemma(transcript, conversationHistory, selectedTemplate);
@@ -174,6 +190,8 @@ export default function RecordScreen({ navigation }: any) {
       setError(err.message);
       setRecordedUri(null);
       setRecordingStatus('idle');
+    } finally {
+      processingRef.current = false;
     }
   };
 
@@ -232,13 +250,67 @@ export default function RecordScreen({ navigation }: any) {
     if (!recordedUri) return;
     try {
       setRecordingStatus('transcribing');
-      const transcription = await transcribeAudio(recordedUri);
+      setLiveTranscript('');
+      setTranslatedText('');
+      setIsEditingTranslation(false);
+      const transcription = await transcribeAudio(
+        recordedUri,
+        (partial) => setLiveTranscript(partial),
+        sttModel
+      );
       setRawTranscript(transcription.rawTranscript);
-      await processTranscription(transcription.rawTranscript);
+      setLiveTranscript(transcription.rawTranscript);
+      setRecordingStatus('editing');
     } catch (err: any) {
       setError(err.message);
       setRecordingStatus('preview');
     }
+  };
+
+  const handleUseTranscript = async () => {
+    const text = liveTranscript.trim();
+    if (!text) {
+      setError('कृपया पाठ सम्पादन गर्नुहोस्');
+      return;
+    }
+    setRawTranscript(text);
+
+    const isDevanagari = /[\u0900-\u097F]/.test(text);
+    if (isDevanagari) {
+      log('Already Nepali — skipping translation');
+      setIsEditingTranslation(false);
+      await processTranscription(text);
+      return;
+    }
+
+    if (processingRef.current) return;
+    processingRef.current = true;
+    try {
+      setRecordingStatus('translating');
+      log('Translating...');
+      const translated = await translateTranscript(text);
+      log('Translated: ' + translated.substring(0, 60));
+      setTranslatedText(translated);
+      setIsEditingTranslation(true);
+      setRecordingStatus('editing');
+    } catch (err: any) {
+      log('ERROR translating: ' + err.message);
+      setIsEditingTranslation(false);
+      setRecordingStatus('editing');
+    } finally {
+      processingRef.current = false;
+    }
+  };
+
+  const handleUseTranslation = async () => {
+    const text = translatedText.trim();
+    if (!text) {
+      setError('कृपया अनुवाद सम्पादन गर्नुहोस्');
+      return;
+    }
+    setRawTranscript(text);
+    setIsEditingTranslation(false);
+    await processTranscription(text);
   };
 
   const handleReRecord = () => {
@@ -251,17 +323,21 @@ export default function RecordScreen({ navigation }: any) {
 
   const statusText = isRecording
     ? 'रेकर्डिङ हुँदैछ...'
+    : recordingStatus === 'editing'
+    ? 'पाठ सम्पादन गर्नुहोस्'
     : isPreview
-    ? 'रেকर्डिङ तयार छ'
+    ? 'रेकर्डिङ तयार छ'
     : recordingStatus === 'transcribing'
     ? 'लिप्यन्तरण हुँदै...'
+    : recordingStatus === 'translating'
+    ? 'नेपालीमा अनुवाद हुँदै...'
     : recordingStatus === 'processing'
     ? 'प्रशोधन हुँदै...'
     : clarifying
     ? 'जवाफ रेकर्ड गर्नुहोस्'
     : 'बोल्न सुरु गर्नुहोस्';
 
-  const statusColor = isRecording ? colors.error : isPreview ? colors.tertiary : clarifying ? colors.tertiary : colors.primary;
+  const statusColor = isRecording ? colors.error : recordingStatus === 'editing' ? colors.tertiary : isPreview ? colors.tertiary : clarifying ? colors.tertiary : colors.primary;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -299,6 +375,32 @@ export default function RecordScreen({ navigation }: any) {
               );
             })}
           </ScrollView>
+        </View>
+      )}
+
+      {/* STT Model Picker (hide during preview, whisper-only) */}
+      {!isPreview && STT_PROVIDER === 'whisper' && (
+        <View style={styles.sttPickerSection}>
+          {STT_MODELS.map((m) => {
+            const isActive = sttModel === m.id;
+            return (
+              <Pressable
+                key={m.id}
+                onPress={() => setSttModel(m.id)}
+                style={[
+                  styles.sttPickerChip,
+                  isActive && { backgroundColor: colors.secondary, borderColor: colors.secondary },
+                ]}
+              >
+                <Text style={[styles.sttPickerLabel, isActive && { color: '#fff' }]}>
+                  {m.label}
+                </Text>
+                <Text style={[styles.sttPickerHint, isActive && { color: '#fff' }]}>
+                  {m.hint}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       )}
 
@@ -377,6 +479,53 @@ export default function RecordScreen({ navigation }: any) {
               </Pressable>
             </View>
           </View>
+        ) : recordingStatus === 'editing' || recordingStatus === 'transcribing' || recordingStatus === 'translating' ? (
+          <View style={styles.editingSection}>
+            <TextInput
+              multiline
+              value={isEditingTranslation ? translatedText : liveTranscript}
+              onChangeText={isEditingTranslation ? setTranslatedText : setLiveTranscript}
+              placeholder={
+                recordingStatus === 'transcribing'
+                  ? 'लिप्यन्तरण हुँदैछ...'
+                  : recordingStatus === 'translating'
+                  ? 'नेपालीमा अनुवाद गर्दैछ...'
+                  : isEditingTranslation
+                  ? 'अनुवाद सम्पादन गर्नुहोस्...'
+                  : 'लिप्यन्तरण सम्पादन गर्नुहोस्...'
+              }
+              style={styles.transcriptInput}
+              textAlignVertical="top"
+              editable={recordingStatus === 'editing'}
+            />
+            <View style={styles.previewActions}>
+              <Pressable
+                onPress={handleReRecord}
+                style={({ pressed }) => [
+                  styles.previewActionBtn,
+                  styles.previewActionReRecord,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={styles.previewActionIcon}>🔄</Text>
+                <Text style={styles.previewActionLabel}>पुन: रेकर्ड</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={isEditingTranslation ? handleUseTranslation : handleUseTranscript}
+                style={({ pressed }) => [
+                  styles.previewActionBtn,
+                  styles.previewActionConfirm,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={styles.previewActionIcon}>✅</Text>
+                <Text style={styles.previewActionLabel}>
+                  {isEditingTranslation ? 'प्रयोग गर्नुहोस्' : 'अनुवाद गर्नुहोस्'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         ) : (
           <>
             {/* Mic Button with Pulse Rings */}
@@ -431,7 +580,9 @@ export default function RecordScreen({ navigation }: any) {
             {statusText}
           </Text>
           <Text style={styles.subtitle}>
-            {isPreview
+            {recordingStatus === 'editing'
+              ? 'पाठ सम्पादन गरेर प्रयोग गर्नुहोस्'
+              : isPreview
               ? 'आफ्नो रेकर्डिङ सुन्नुहोस् र पुष्टि गर्नुहोस्'
               : clarifying
               ? 'माथिको प्रश्नको जवाफ दिनुहोस्'
@@ -551,6 +702,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.textMain,
+  },
+  sttPickerSection: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.containerMargin,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  sttPickerChip: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.surfaceContainerLowest,
+  },
+  sttPickerLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMain,
+  },
+  sttPickerHint: {
+    fontSize: 10,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   clarificationBanner: {
     marginHorizontal: spacing.containerMargin,
@@ -749,5 +926,15 @@ const styles = StyleSheet.create({
     color: '#0f0',
     fontFamily: 'monospace',
     lineHeight: 16,
+  },
+  editingSection: {
+    alignSelf: 'stretch',
+    marginBottom: 32,
+  },
+  transcriptInput: {
+    backgroundColor: colors.surface,
+    minHeight: 160,
+    marginBottom: 16,
+    fontSize: 16,
   },
 });

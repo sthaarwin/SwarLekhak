@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { DocumentState, GemmaAnalysisResult, RecordingStatus, DocumentType, ConversationEntry } from '../types';
+import { DocumentState, GemmaAnalysisResult, RecordingStatus, DocumentType, ConversationEntry, SttModel } from '../types';
 import { getStorage } from './storage';
 
 interface DocumentStore extends DocumentState {
@@ -10,6 +10,7 @@ interface DocumentStore extends DocumentState {
   setGemmaResult: (result: GemmaAnalysisResult | null) => void;
   setError: (error: string | null) => void;
   setSelectedTemplate: (template: DocumentType | 'AUTO') => void;
+  setSttModel: (model: SttModel) => void;
   addToHistory: (transcript: string, result: GemmaAnalysisResult) => void;
   removeHistoryItem: (id: string) => void;
   addToConversationHistory: (entry: ConversationEntry) => void;
@@ -25,6 +26,7 @@ const initialState: DocumentState = {
   gemmaResult: null,
   error: null,
   selectedTemplate: 'AUTO',
+  sttModel: 'base',
   history: [],
   conversationHistory: [],
 };
@@ -40,6 +42,7 @@ export const useDocumentStore = create<DocumentStore>()(
       setGemmaResult: (result) => set({ gemmaResult: result }),
       setError: (error) => set({ error }),
       setSelectedTemplate: (template) => set({ selectedTemplate: template }),
+      setSttModel: (model) => set({ sttModel: model }),
 
       addToHistory: (transcript, result) =>
         set((state) => ({
@@ -83,6 +86,7 @@ export const useDocumentStore = create<DocumentStore>()(
       partialize: (state) => ({
         history: state.history,
         selectedTemplate: state.selectedTemplate,
+        sttModel: state.sttModel,
       }),
     }
   )
