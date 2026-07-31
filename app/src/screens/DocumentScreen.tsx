@@ -8,9 +8,10 @@ import {
   Alert,
 } from 'react-native';
 import { Text, Button } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import { useDocumentStore } from '../store/useDocumentStore';
-import { colors, spacing } from '../theme';
+import { colors, spacing, typeScale } from '../theme';
 
 export default function DocumentScreen() {
   const { gemmaResult } = useDocumentStore();
@@ -343,7 +344,7 @@ export default function DocumentScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <View style={[styles.statIconBox, { backgroundColor: `${colors.primary}10` }]}>
-              <Text style={[styles.statIcon, { color: colors.primary }]}>📄</Text>
+              <MaterialCommunityIcons name="file-document-outline" size={20} color={colors.primary} />
             </View>
             <View>
               <Text style={styles.statLabel}>फाइल प्रकार</Text>
@@ -352,7 +353,7 @@ export default function DocumentScreen() {
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIconBox, { backgroundColor: `${colors.primary}10` }]}>
-              <Text style={[styles.statIcon, { color: colors.primary }]}>🌐</Text>
+              <MaterialCommunityIcons name="translate" size={20} color={colors.primary} />
             </View>
             <View>
               <Text style={styles.statLabel}>भाषा</Text>
@@ -361,11 +362,17 @@ export default function DocumentScreen() {
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIconBox, { backgroundColor: `${colors.primary}10` }]}>
-              <Text style={[styles.statIcon, { color: colors.primary }]}>📝</Text>
+              <MaterialCommunityIcons name="format-list-bulleted" size={20} color={colors.primary} />
             </View>
             <View>
               <Text style={styles.statLabel}>शब्द संख्या</Text>
-              <Text style={styles.statValue}>१४२ शब्द</Text>
+              <Text style={styles.statValue}>
+                {Object.values(editableFields)
+                  .filter(Boolean)
+                  .join(' ')
+                  .split(/\s+/).filter(Boolean).length}
+                {' शब्द'}
+              </Text>
             </View>
           </View>
         </View>
@@ -373,16 +380,6 @@ export default function DocumentScreen() {
 
       {/* Floating Action Bar */}
       <View style={styles.actionBar}>
-        <Button
-          mode="outlined"
-          icon="pencil"
-          textColor={colors.primary}
-          style={styles.actionBtn}
-          labelStyle={styles.actionBtnLabel}
-          onPress={() => {}}
-        >
-          सम्पादन गर्नुहोस्
-        </Button>
         <Button
           mode="contained"
           icon="file-pdf-box"
@@ -438,8 +435,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   pageTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...typeScale.sectionTitle,
     color: colors.govBlueDark,
     marginTop: 2,
   },
@@ -593,9 +589,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  statIcon: {
-    fontSize: 20,
   },
   statLabel: {
     fontSize: 12,

@@ -7,22 +7,23 @@ import {
   Pressable,
   ScrollView,
 } from 'react-native';
-import { Text } from 'react-native-paper';
-import { TextInput } from 'react-native-paper';
+import { Text, TextInput } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
 import { useDocumentStore } from '../store/useDocumentStore';
 import { transcribeAudio } from '../services/sttService';
 import { analyzeWithGemma, translateTranscript } from '../services/gemmaService';
 import { startRecording, stopRecording, requestRecordPermission } from '../services/wavRecorderService';
-import { colors, spacing } from '../theme';
+import { colors, spacing, typeScale } from '../theme';
 import type { DocumentType } from '../types';
 
 const BAR_COUNT = 32;
-const TEMPLATES: { id: DocumentType | 'AUTO'; title: string; icon: string; color: string }[] = [
-  { id: 'AUTO', title: 'स्वचालित', icon: '🤖', color: colors.primary },
-  { id: 'NIVEDAN', title: 'निवेदन', icon: '📄', color: colors.govBlueDark },
-  { id: 'MEDICAL', title: 'स्वास्थ्य', icon: '🏥', color: colors.tertiary },
-  { id: 'POLICE_REPORT', title: 'प्रहरी उजुरी', icon: '⚖️', color: colors.secondary },
+const DEVANAGARI_RE = /[\u0900-\u097F]/;
+const TEMPLATES: { id: DocumentType | 'AUTO'; title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; color: string }[] = [
+  { id: 'AUTO', title: 'स्वचालित', icon: 'auto-fix', color: colors.primary },
+  { id: 'NIVEDAN', title: 'निवेदन', icon: 'file-document-outline', color: colors.govBlueDark },
+  { id: 'MEDICAL', title: 'स्वास्थ्य', icon: 'hospital-box-outline', color: colors.tertiary },
+  { id: 'POLICE_REPORT', title: 'प्रहरी उजुरी', icon: 'scale-balance', color: colors.secondary },
 ];
 
 export default function RecordScreen({ navigation }: any) {
@@ -33,22 +34,14 @@ export default function RecordScreen({ navigation }: any) {
   const waveInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const [micScale] = useState(() => new Animated.Value(1));
   const [clarifying, setClarifying] = useState(false);
-  const [recordedUri, setRecordedUri] = useState<string | null>(null);
-  const [liveTranscript, setLiveTranscript] = useState('');
-  const [translatedText, setTranslatedText] = useState('');
-  const [isEditingTranslation, setIsEditingTranslation] = useState(false);
-  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [transcript, setTranscript] = useState('');
   const processingRef = useRef(false);
   const player = useAudioPlayer(null);
-
-  const log = useCallback((msg: string) => {
-    console.log('[Record]', msg);
-    setDebugLog((prev) => [msg, ...prev].slice(0, 8));
-  }, []);
 
   const {
     recordingStatus,
     setRecordingStatus,
+    audioUri,
     setAudioUri,
     setRawTranscript,
     setGemmaResult,
@@ -134,10 +127,10 @@ export default function RecordScreen({ navigation }: any) {
   }, []);
 
   useEffect(() => {
-    if (recordedUri) {
-      player.replace(recordedUri);
+    if (audioUri) {
+      player.replace(audioUri);
     }
-  }, [recordedUri]);
+  }, [audioUri]);
 
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],
@@ -167,7 +160,7 @@ export default function RecordScreen({ navigation }: any) {
         setClarifying(true);
         addToConversationHistory({ role: 'user', content: transcript });
         addToConversationHistory({ role: 'assistant', content: result.followUpQuestionNepali || '' });
-        setRecordedUri(null);
+        setAudioUri(null);
         setRecordingStatus('idle');
       } else {
         addToConversationHistory({ role: 'user', content: transcript });
@@ -179,14 +172,14 @@ export default function RecordScreen({ navigation }: any) {
         );
         setRecordingStatus('complete');
         clearConversationHistory();
-        setRecordedUri(null);
+        setAudioUri(null);
         if (result.documentType) {
           navigation.navigate('Document');
         }
       }
     } catch (err: any) {
       setError(err.message);
-      setRecordedUri(null);
+      setAudioUri(null);
       setRecordingStatus('idle');
     } finally {
       processingRef.current = false;
@@ -196,10 +189,7 @@ export default function RecordScreen({ navigation }: any) {
   const handleMicPress = async () => {
     if (isRecording) {
       try {
-        log('Stopping recording...');
         const uri = await stopRecording();
-        log('Recording saved: ' + uri);
-        setRecordedUri(uri);
         setAudioUri(uri);
         if (!uri) {
           setError('अडियो रेकर्ड गर्न सकिएन');
@@ -208,26 +198,21 @@ export default function RecordScreen({ navigation }: any) {
         }
         setRecordingStatus('preview');
       } catch (err: any) {
-        log('ERROR stopping: ' + err.message);
         setError(err.message);
         setRecordingStatus('idle');
       }
     } else {
       try {
-        log('Requesting mic permission...');
         const hasPermission = await requestRecordPermission();
         if (!hasPermission) {
           setError('माइक्रोफोन अनुमति आवश्यक छ');
           return;
         }
         setError(null);
-        log('Starting recording...');
         await startRecording();
-        log('Recording started');
         setRecordingStatus('recording');
         setAudioUri(null);
       } catch (err: any) {
-        log('ERROR starting: ' + err.message);
         setError(err.message);
         setRecordingStatus('idle');
       }
@@ -245,15 +230,13 @@ export default function RecordScreen({ navigation }: any) {
   const handleConfirm = async () => {
     player.pause();
     player.seekTo(0);
-    if (!recordedUri) return;
+    if (!audioUri) return;
     try {
       setRecordingStatus('transcribing');
-      setLiveTranscript('');
-      setTranslatedText('');
-      setIsEditingTranslation(false);
-      const transcription = await transcribeAudio(recordedUri);
+      setTranscript('');
+      const transcription = await transcribeAudio(audioUri);
       setRawTranscript(transcription.rawTranscript);
-      setLiveTranscript(transcription.rawTranscript);
+      setTranscript(transcription.rawTranscript);
       setRecordingStatus('editing');
     } catch (err: any) {
       setError(err.message);
@@ -261,56 +244,36 @@ export default function RecordScreen({ navigation }: any) {
     }
   };
 
-  const handleUseTranscript = async () => {
-    const text = liveTranscript.trim();
+  const handleUseText = async () => {
+    const text = transcript.trim();
     if (!text) {
       setError('कृपया पाठ सम्पादन गर्नुहोस्');
       return;
     }
     setRawTranscript(text);
-
-    const isDevanagari = /[\u0900-\u097F]/.test(text);
-    if (isDevanagari) {
-      log('Already Nepali — skipping translation');
-      setIsEditingTranslation(false);
+    if (DEVANAGARI_RE.test(text)) {
       await processTranscription(text);
       return;
     }
-
     if (processingRef.current) return;
     processingRef.current = true;
     try {
       setRecordingStatus('translating');
-      log('Translating...');
       const translated = await translateTranscript(text);
-      log('Translated: ' + translated.substring(0, 60));
-      setTranslatedText(translated);
-      setIsEditingTranslation(true);
+      setTranscript(translated);
+      setRawTranscript(translated);
       setRecordingStatus('editing');
     } catch (err: any) {
-      log('ERROR translating: ' + err.message);
-      setIsEditingTranslation(false);
+      setError(err.message);
       setRecordingStatus('editing');
     } finally {
       processingRef.current = false;
     }
   };
 
-  const handleUseTranslation = async () => {
-    const text = translatedText.trim();
-    if (!text) {
-      setError('कृपया अनुवाद सम्पादन गर्नुहोस्');
-      return;
-    }
-    setRawTranscript(text);
-    setIsEditingTranslation(false);
-    await processTranscription(text);
-  };
-
   const handleReRecord = () => {
     player.pause();
     player.seekTo(0);
-    setRecordedUri(null);
     setAudioUri(null);
     setRecordingStatus('idle');
   };
@@ -335,7 +298,8 @@ export default function RecordScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.dotPattern} pointerEvents="none" />
+      <View style={styles.glowTop} pointerEvents="none" />
+      <View style={styles.glowBottom} pointerEvents="none" />
 
       {/* Template Carousel (hide during preview) */}
       {!isPreview && (
@@ -356,7 +320,11 @@ export default function RecordScreen({ navigation }: any) {
                     isActive && { backgroundColor: template.color, borderColor: template.color },
                   ]}
                 >
-                  <Text style={styles.templateChipIcon}>{template.icon}</Text>
+                  <MaterialCommunityIcons
+                    name={template.icon}
+                    size={16}
+                    color={isActive ? '#fff' : template.color}
+                  />
                   <Text
                     style={[
                       styles.templateChipLabel,
@@ -411,38 +379,46 @@ export default function RecordScreen({ navigation }: any) {
           <View style={styles.previewSection}>
             <Pressable
               onPress={handlePlayPause}
+              accessibilityRole="button"
+              accessibilityLabel={player.playing ? 'प्ले रोक्नुहोस्' : 'रेकर्डिङ सुन्नुहोस्'}
               style={({ pressed }) => [
                 styles.playButton,
-                pressed && { opacity: 0.7 },
+                pressed && { transform: [{ scale: 0.94 }] },
               ]}
             >
-              <Text style={styles.playButtonIcon}>
-                {player.playing ? '⏸' : '▶️'}
-              </Text>
+              <MaterialCommunityIcons
+                name={player.playing ? 'pause' : 'play'}
+                size={40}
+                color="#fff"
+              />
             </Pressable>
 
             <View style={styles.previewActions}>
               <Pressable
                 onPress={handleReRecord}
+                accessibilityRole="button"
+                accessibilityLabel="पुन: रेकर्ड"
                 style={({ pressed }) => [
                   styles.previewActionBtn,
                   styles.previewActionReRecord,
-                  pressed && { opacity: 0.7 },
+                  pressed && { transform: [{ scale: 0.96 }] },
                 ]}
               >
-                <Text style={styles.previewActionIcon}>🔄</Text>
+                <MaterialCommunityIcons name="refresh" size={20} color={colors.error} />
                 <Text style={styles.previewActionLabel}>पुन: रेकर्ड</Text>
               </Pressable>
 
               <Pressable
                 onPress={handleConfirm}
+                accessibilityRole="button"
+                accessibilityLabel="रेकर्डिङ पुष्टि गर्नुहोस्"
                 style={({ pressed }) => [
                   styles.previewActionBtn,
                   styles.previewActionConfirm,
-                  pressed && { opacity: 0.7 },
+                  pressed && { transform: [{ scale: 0.96 }] },
                 ]}
               >
-                <Text style={styles.previewActionIcon}>✅</Text>
+                <MaterialCommunityIcons name="check" size={20} color="#fff" />
                 <Text style={styles.previewActionLabel}>पुष्टि गर्नुहोस्</Text>
               </Pressable>
             </View>
@@ -451,16 +427,14 @@ export default function RecordScreen({ navigation }: any) {
           <View style={styles.editingSection}>
             <TextInput
               multiline
-              value={isEditingTranslation ? translatedText : liveTranscript}
-              onChangeText={isEditingTranslation ? setTranslatedText : setLiveTranscript}
+              value={transcript}
+              onChangeText={setTranscript}
               placeholder={
                 recordingStatus === 'transcribing'
                   ? 'लिप्यन्तरण हुँदैछ...'
                   : recordingStatus === 'translating'
                   ? 'नेपालीमा अनुवाद गर्दैछ...'
-                  : isEditingTranslation
-                  ? 'अनुवाद सम्पादन गर्नुहोस्...'
-                  : 'लिप्यन्तरण सम्पादन गर्नुहोस्...'
+                  : 'पाठ सम्पादन गर्नुहोस्...'
               }
               style={styles.transcriptInput}
               textAlignVertical="top"
@@ -469,27 +443,31 @@ export default function RecordScreen({ navigation }: any) {
             <View style={styles.previewActions}>
               <Pressable
                 onPress={handleReRecord}
+                accessibilityRole="button"
+                accessibilityLabel="पुन: रेकर्ड"
                 style={({ pressed }) => [
                   styles.previewActionBtn,
                   styles.previewActionReRecord,
-                  pressed && { opacity: 0.7 },
+                  pressed && { transform: [{ scale: 0.96 }] },
                 ]}
               >
-                <Text style={styles.previewActionIcon}>🔄</Text>
+                <MaterialCommunityIcons name="refresh" size={20} color={colors.error} />
                 <Text style={styles.previewActionLabel}>पुन: रेकर्ड</Text>
               </Pressable>
 
               <Pressable
-                onPress={isEditingTranslation ? handleUseTranslation : handleUseTranscript}
+                onPress={handleUseText}
+                accessibilityRole="button"
+                accessibilityLabel={DEVANAGARI_RE.test(transcript) ? 'पाठ प्रयोग गर्नुहोस्' : 'अनुवाद गर्नुहोस्'}
                 style={({ pressed }) => [
                   styles.previewActionBtn,
                   styles.previewActionConfirm,
-                  pressed && { opacity: 0.7 },
+                  pressed && { transform: [{ scale: 0.96 }] },
                 ]}
               >
-                <Text style={styles.previewActionIcon}>✅</Text>
+                <MaterialCommunityIcons name="check" size={20} color="#fff" />
                 <Text style={styles.previewActionLabel}>
-                  {isEditingTranslation ? 'प्रयोग गर्नुहोस्' : 'अनुवाद गर्नुहोस्'}
+                  {DEVANAGARI_RE.test(transcript) ? 'प्रयोग गर्नुहोस्' : 'अनुवाद गर्नुहोस्'}
                 </Text>
               </Pressable>
             </View>
@@ -520,6 +498,8 @@ export default function RecordScreen({ navigation }: any) {
               <Animated.View style={{ transform: [{ scale: micScale }] }}>
                 <Pressable
                   onPress={handleMicPress}
+                  accessibilityRole="button"
+                  accessibilityLabel={isRecording ? 'रेकर्डिङ रोक्नुहोस्' : 'रेकर्डिङ सुरु गर्नुहोस्'}
                   style={({ pressed }) => [
                     styles.micButton,
                     {
@@ -528,9 +508,11 @@ export default function RecordScreen({ navigation }: any) {
                     },
                   ]}
                 >
-                  <Text style={styles.micIcon}>
-                    {isRecording ? '⏹' : '🎤'}
-                  </Text>
+                  <MaterialCommunityIcons
+                    name={isRecording ? 'stop' : 'microphone'}
+                    size={48}
+                    color="#fff"
+                  />
                 </Pressable>
               </Animated.View>
             </View>
@@ -568,9 +550,7 @@ export default function RecordScreen({ navigation }: any) {
                   { backgroundColor: `${colors.tertiary}10` },
                 ]}
               >
-                <Text style={[styles.contextIcon, { color: colors.tertiary }]}>
-                  🌐
-                </Text>
+                <MaterialCommunityIcons name="translate" size={20} color={colors.tertiary} />
               </View>
               <View>
                 <Text style={styles.contextLabel}>LANGUAGE</Text>
@@ -584,9 +564,7 @@ export default function RecordScreen({ navigation }: any) {
                   { backgroundColor: `${colors.primary}10` },
                 ]}
               >
-                <Text style={[styles.contextIcon, { color: colors.primary }]}>
-                  📄
-                </Text>
+                <MaterialCommunityIcons name="file-document-outline" size={20} color={colors.primary} />
               </View>
               <View>
                 <Text style={styles.contextLabel}>TEMPLATE</Text>
@@ -595,15 +573,6 @@ export default function RecordScreen({ navigation }: any) {
                 </Text>
               </View>
             </View>
-          </View>
-        )}
-
-        {/* Debug Log */}
-        {__DEV__ && (
-          <View style={styles.debugPanel}>
-            {debugLog.map((line, i) => (
-              <Text key={i} style={styles.debugLine}>{line}</Text>
-            ))}
           </View>
         )}
 
@@ -638,14 +607,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  dotPattern: {
-    ...StyleSheet.absoluteFill,
-    opacity: 0.05,
-    backgroundColor: 'transparent',
-    backgroundImage:
-      'radial-gradient(circle at 2px 2px, #003f87 1px, transparent 0)',
-    backgroundSize: '32px 32px',
-  } as any,
+  glowTop: {
+    position: 'absolute',
+    top: -90,
+    alignSelf: 'center',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: `${colors.primary}12`,
+  },
+  glowBottom: {
+    position: 'absolute',
+    bottom: -110,
+    alignSelf: 'center',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: `${colors.tertiary}0F`,
+  },
   carouselSection: {
     paddingTop: spacing.sectionPadding,
     paddingBottom: 8,
@@ -664,9 +643,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.borderSubtle,
     backgroundColor: colors.surfaceContainerLowest,
-  },
-  templateChipIcon: {
-    fontSize: 16,
   },
   templateChipLabel: {
     fontSize: 14,
@@ -742,11 +718,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  micIcon: {
-    fontSize: 48,
-  },
-  previewSection: {
-    alignItems: 'center',
+  previewSection: {    alignItems: 'center',
     marginBottom: 32,
   },
   playButton: {
@@ -762,9 +734,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-  playButtonIcon: {
-    fontSize: 40,
   },
   previewActions: {
     flexDirection: 'row',
@@ -786,9 +755,6 @@ const styles = StyleSheet.create({
   previewActionConfirm: {
     backgroundColor: colors.primary,
   },
-  previewActionIcon: {
-    fontSize: 20,
-  },
   previewActionLabel: {
     fontSize: 16,
     fontWeight: '700',
@@ -799,12 +765,11 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   statusText: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...typeScale.sectionTitle,
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
+    ...typeScale.body,
     color: colors.textMuted,
     textAlign: 'center',
     maxWidth: 280,
@@ -833,9 +798,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  contextIcon: {
-    fontSize: 20,
-  },
   contextLabel: {
     fontSize: 12,
     fontWeight: '600',
@@ -856,20 +818,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary,
-  },
-  debugPanel: {
-    marginTop: 12,
-    padding: 10,
-    alignSelf: 'stretch',
-    backgroundColor: '#000',
-    borderRadius: 8,
-    minHeight: 30,
-  },
-  debugLine: {
-    fontSize: 11,
-    color: '#0f0',
-    fontFamily: 'monospace',
-    lineHeight: 16,
   },
   editingSection: {
     alignSelf: 'stretch',

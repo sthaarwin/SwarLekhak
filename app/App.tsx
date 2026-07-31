@@ -5,8 +5,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { Session } from '@supabase/supabase-js';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, StyleSheet, Text, Pressable } from 'react-native';
-import theme, { colors } from './src/theme';
+import theme, { colors, spacing } from './src/theme';
 import RecordScreen from './src/screens/RecordScreen';
 import TemplatesScreen from './src/screens/TemplatesScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
@@ -18,10 +19,10 @@ import { supabase } from './src/services/supabaseClient';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const TAB_ICONS: Record<string, string> = {
-  Record: '🎤',
-  Templates: '📄',
-  History: '📋',
+const TAB_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  Record: 'microphone',
+  Templates: 'file-document-outline',
+  History: 'history',
 };
 
 function TabBar({ state, descriptors, navigation: nav }: any) {
@@ -48,16 +49,22 @@ function TabBar({ state, descriptors, navigation: nav }: any) {
           <Pressable
             key={route.key}
             onPress={onPress}
+            accessibilityRole="tab"
+            accessibilityState={isFocused ? { selected: true } : {}}
             style={({ pressed }) => [
               styles.tabItem,
               isFocused && styles.tabItemActive,
-              pressed && { transform: [{ scale: 0.95 }] },
+              pressed && { transform: [{ scale: 0.94 }] },
             ]}
           >
-            <Text style={[styles.tabIcon, isFocused && styles.tabIconActive]}>
-              {tabIcon}
-            </Text>
-            <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
+            <MaterialCommunityIcons
+              name={tabIcon}
+              size={22}
+              color={isFocused ? colors.primary : colors.textMuted}
+            />
+            <Text
+              style={[styles.tabLabel, isFocused && styles.tabLabelActive]}
+            >
               {route.name}
             </Text>
           </Pressable>
@@ -74,7 +81,7 @@ function TopBar({ session, navigation, userName }: { session: Session; navigatio
   return (
     <View style={styles.topBar}>
       <View style={styles.topBarLeft}>
-        <Text style={styles.menuIcon}>☰</Text>
+        <MaterialCommunityIcons name="seal" size={26} color={colors.govBlueDark} />
         <Text style={styles.topBarTitle}>Swar-Lekhak</Text>
       </View>
       <Pressable
@@ -217,11 +224,7 @@ const styles = StyleSheet.create({
   topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  menuIcon: {
-    fontSize: 24,
-    color: colors.primary,
+    gap: 10,
   },
   topBarTitle: {
     fontSize: 22,
@@ -287,13 +290,6 @@ const styles = StyleSheet.create({
   tabItemActive: {
     backgroundColor: colors.secondaryContainer,
     paddingHorizontal: 16,
-  },
-  tabIcon: {
-    fontSize: 22,
-    opacity: 0.6,
-  },
-  tabIconActive: {
-    opacity: 1,
   },
   tabLabel: {
     fontSize: 12,

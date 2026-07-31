@@ -38,7 +38,7 @@ export default function ProfileScreen({ navigation }: any) {
         setFullName(data.full_name || '');
       }
     } catch (err: any) {
-      Alert.alert('Error', 'Could not fetch profile: ' + err.message);
+      Alert.alert('त्रुटि', 'प्रोफाइल ल्याउन सकिएन: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -60,9 +60,9 @@ export default function ProfileScreen({ navigation }: any) {
 
       if (error) throw error;
 
-      Alert.alert('Success', 'Profile updated successfully');
+      Alert.alert('सफल', 'प्रोफाइल अद्यावधिक गरियो');
     } catch (err: any) {
-      Alert.alert('Error', 'Could not update profile: ' + err.message);
+      Alert.alert('त्रुटि', 'प्रोफाइल अद्यावधिक गर्न सकिएन: ' + err.message);
     } finally {
       setSaving(false);
     }
@@ -79,7 +79,7 @@ export default function ProfileScreen({ navigation }: any) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <Text>Loading profile...</Text>
+        <Text>प्रोफाइल लोड हुँदैछ...</Text>
       </View>
     );
   }
@@ -87,18 +87,18 @@ export default function ProfileScreen({ navigation }: any) {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>User Profile</Text>
+        <Text style={styles.title}>प्रोफाइल</Text>
 
         <View style={styles.section}>
           <TextInput
-            label="Email"
+            label="इमेल"
             value={email}
             editable={false}
             style={styles.input}
             mode="outlined"
           />
           <TextInput
-            label="Full Name"
+            label="पूरा नाम"
             value={fullName}
             onChangeText={setFullName}
             style={styles.input}
@@ -112,7 +112,7 @@ export default function ProfileScreen({ navigation }: any) {
           loading={saving}
           style={styles.saveButton}
         >
-          Save Profile
+          प्रोफाइल सेभ गर्नुहोस्
         </Button>
 
         <Divider style={styles.divider} />
@@ -123,7 +123,7 @@ export default function ProfileScreen({ navigation }: any) {
           textColor={colors.error}
           style={styles.signOutButton}
         >
-          Sign Out
+          साइन आउट
         </Button>
       </View>
     </ScrollView>
@@ -146,8 +146,8 @@ const styles = StyleSheet.create({
     paddingTop: 60,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '800',
     color: colors.govBlueDark,
     marginBottom: 24,
     textAlign: 'center',

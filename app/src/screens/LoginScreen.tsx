@@ -27,12 +27,12 @@ export default function LoginScreen() {
 
     const normalizedEmail = email.trim();
     if (!normalizedEmail || !password) {
-      setError('Email and password are required.');
+      setError('इमेल र पासवर्ड दुवै आवश्यक छ।');
       return;
     }
 
     if (isSignUp && !fullName.trim()) {
-      setError('Full name is required for sign-up.');
+      setError('खाता खोल्न पूरा नाम आवश्यक छ।');
       return;
     }
 
@@ -78,7 +78,7 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (isSignUp) {
-      setMessage('Account created. Check your email if confirmation is enabled.');
+      setMessage('खाता खुल्यो। इमेल पुष्टि सक्षम भए तपाईंको इमेल जाँच गर्नुहोस्।');
     }
   };
 
@@ -91,7 +91,7 @@ export default function LoginScreen() {
         <View style={styles.brandBlock}>
           <Text style={styles.brand}>Swar-Lekhak</Text>
           <Text style={styles.title}>
-            {isSignUp ? 'Create your account' : 'Sign in to continue'}
+            {isSignUp ? 'नयाँ खाता खोल्नुहोस्' : 'जारी राख्न साइन इन गर्नुहोस्'}
           </Text>
         </View>
 
@@ -105,7 +105,7 @@ export default function LoginScreen() {
             style={[styles.segment, !isSignUp && styles.segmentActive]}
           >
             <Text style={[styles.segmentText, !isSignUp && styles.segmentTextActive]}>
-              Sign In
+              साइन इन
             </Text>
           </Pressable>
           <Pressable
@@ -117,7 +117,7 @@ export default function LoginScreen() {
             style={[styles.segment, isSignUp && styles.segmentActive]}
           >
             <Text style={[styles.segmentText, isSignUp && styles.segmentTextActive]}>
-              Sign Up
+              खाता खोल्नुहोस्
             </Text>
           </Pressable>
         </View>
@@ -125,7 +125,7 @@ export default function LoginScreen() {
         <View style={styles.form}>
           {isSignUp && (
             <TextInput
-              label="Full Name"
+              label="पूरा नाम"
               mode="outlined"
               onChangeText={setFullName}
               value={fullName}
@@ -135,14 +135,14 @@ export default function LoginScreen() {
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
-            label="Email"
+            label="इमेल"
             mode="outlined"
             onChangeText={setEmail}
             value={email}
           />
           <TextInput
             autoCapitalize="none"
-            label="Password"
+            label="पासवर्ड"
             mode="outlined"
             onChangeText={setPassword}
             secureTextEntry
@@ -159,7 +159,7 @@ export default function LoginScreen() {
             onPress={handleSubmit}
             style={styles.submit}
           >
-            {isSignUp ? 'Create Account' : 'Sign In'}
+            {isSignUp ? 'खाता खोल्नुहोस्' : 'साइन इन'}
           </Button>
         </View>
       </View>

@@ -1,6 +1,7 @@
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors, spacing } from '../theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { colors, spacing, typeScale } from '../theme';
 import { useDocumentStore } from '../store/useDocumentStore';
 import type { DocumentType } from '../types';
 
@@ -9,7 +10,7 @@ const TEMPLATES = [
     id: 'NIVEDAN' as DocumentType,
     title: 'निवेदन',
     description: 'सरकारी कार्यालय वा संस्थाका लागि औपचारिक निवेदन पत्र तयार पार्नुहोस्।',
-    icon: '📄',
+    icon: 'file-document-outline' as keyof typeof MaterialCommunityIcons.glyphMap,
     iconBg: colors.primaryFixed,
     iconColor: colors.primary,
   },
@@ -17,7 +18,7 @@ const TEMPLATES = [
     id: 'MEDICAL' as DocumentType,
     title: 'स्वास्थ्य सिफारिस',
     description: 'बिदा वा अन्य प्रयोजनका लागि स्वास्थ्य अवस्थाको आधिकारिक सिफारिस।',
-    icon: '🏥',
+    icon: 'hospital-box-outline' as keyof typeof MaterialCommunityIcons.glyphMap,
     iconBg: colors.tertiaryFixed,
     iconColor: colors.tertiary,
   },
@@ -25,7 +26,7 @@ const TEMPLATES = [
     id: 'POLICE_REPORT' as DocumentType,
     title: 'एजहार',
     description: 'प्रहरी प्रशासनमा दिइने उजुरी वा घटनाको विस्तृत विवरण।',
-    icon: '⚖️',
+    icon: 'scale-balance' as keyof typeof MaterialCommunityIcons.glyphMap,
     iconBg: colors.secondaryContainer,
     iconColor: colors.secondary,
   },
@@ -65,7 +66,11 @@ export default function TemplatesScreen({ navigation }: any) {
                   { backgroundColor: template.iconBg },
                 ]}
               >
-                <Text style={styles.templateIcon}>{template.icon}</Text>
+                <MaterialCommunityIcons
+                  name={template.icon}
+                  size={28}
+                  color={template.iconColor}
+                />
               </View>
               <View style={styles.templateInfo}>
                 <Text style={styles.templateTitle}>{template.title}</Text>
@@ -73,18 +78,15 @@ export default function TemplatesScreen({ navigation }: any) {
                   {template.description}
                 </Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <MaterialCommunityIcons name="chevron-right" size={26} color={colors.outlineVariant} />
             </Pressable>
           ))}
         </View>
 
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIconBox}>
-            <Text style={styles.emptyIcon}>+</Text>
-          </View>
-          <Text style={styles.emptyText}>
-            नयाँ प्रकारको टेम्प्लेट आवश्यक छ? हाम्रो ग्राहक सेवामा सम्पर्क
-            गर्नुहोस्।
+        <View style={styles.footer}>
+          <MaterialCommunityIcons name="plus-circle-outline" size={24} color={colors.textMuted} />
+          <Text style={styles.footerText}>
+            नयाँ प्रकारको टेम्प्लेट चाहिन्छ? हामीलाई भन्नुहोस्।
           </Text>
         </View>
       </View>
@@ -106,13 +108,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.stackGap * 2,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...typeScale.pageTitle,
     color: colors.govBlueDark,
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 16,
+    ...typeScale.body,
     color: colors.secondary,
   },
   templateList: {
@@ -135,19 +136,16 @@ const styles = StyleSheet.create({
   templateIconBox: {
     width: 48,
     height: 48,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  templateIcon: {
-    fontSize: 28,
   },
   templateInfo: {
     flex: 1,
   },
   templateTitle: {
-    fontSize: 22,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: colors.textMain,
   },
   templateDescription: {
@@ -156,32 +154,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 20,
   },
-  chevron: {
-    fontSize: 24,
-    color: colors.outlineVariant,
-  },
-  emptyState: {
-    marginTop: 48,
-    padding: spacing.sectionPadding,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: colors.outlineVariant,
-    borderRadius: 12,
+  footer: {
+    marginTop: 32,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
   },
-  emptyIconBox: {
-    backgroundColor: colors.surfaceContainer,
-    padding: 12,
-    borderRadius: 24,
-    marginBottom: 12,
-  },
-  emptyIcon: {
-    fontSize: 32,
+  footerText: {
+    fontSize: 14,
     color: colors.textMuted,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: colors.textMuted,
-    textAlign: 'center',
   },
 });
