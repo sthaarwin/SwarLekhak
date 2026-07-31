@@ -15,7 +15,6 @@ module.exports = ({ config }) => {
       'expo-sharing',
     ],
     extra: {
-      googleAiApiKey: process.env.GOOGLE_AI_API_KEY || '',
       openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
       modelProvider: process.env.MODEL_PROVIDER || 'openrouter',
       ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',

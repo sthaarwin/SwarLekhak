@@ -592,11 +592,13 @@ export default function RecordScreen({ navigation }: any) {
         )}
 
         {/* Debug Log */}
-        <View style={styles.debugPanel}>
-          {debugLog.map((line, i) => (
-            <Text key={i} style={styles.debugLine}>{line}</Text>
-          ))}
-        </View>
+        {__DEV__ && (
+          <View style={styles.debugPanel}>
+            {debugLog.map((line, i) => (
+              <Text key={i} style={styles.debugLine}>{line}</Text>
+            ))}
+          </View>
+        )}
 
         {/* Skip clarification */}
         {clarifying && (

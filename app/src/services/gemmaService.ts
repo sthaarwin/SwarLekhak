@@ -56,58 +56,6 @@ Output strict JSON matching this structure:
 }`;
 }
 
-const DEMO_NIVEDAN: GemmaAnalysisResult = {
-  documentType: 'NIVEDAN',
-  confidenceScore: 0.89,
-  extractedFields: {
-    applicantName: 'राम बहादुर गुरुङ',
-    address: 'काठमाडौं-१५, बल्खु',
-    wardNo: '१५',
-    subject: 'वडा सिफारिसको लागि निवेदन',
-  },
-  missingRequiredFields: [],
-  followUpQuestionNepali: null,
-};
-
-const DEMO_MEDICAL: GemmaAnalysisResult = {
-  documentType: 'MEDICAL',
-  confidenceScore: 0.85,
-  extractedFields: {
-    applicantName: 'सीता देवी शर्मा',
-    address: 'ललितपुर-३, पाटन',
-    wardNo: '३',
-    subject: 'स्वास्थ्य परीक्षण प्रतिवेदन',
-    date: '२०८१-०४-१५',
-  },
-  missingRequiredFields: ['wardNo'],
-  followUpQuestionNepali: 'कृपया तपाईंको वडा नम्बर कति हो, भनिदिनुहुन्छ?',
-};
-
-const DEMO_POLICE: GemmaAnalysisResult = {
-  documentType: 'POLICE_REPORT',
-  confidenceScore: 0.82,
-  extractedFields: {
-    applicantName: 'अनिता केसी',
-    address: 'भक्तपुर-८, चाँगुनारायण',
-    wardNo: '८',
-    subject: 'चोरी सम्बन्धी उजुरी',
-    incidentDetails: 'मिति २०८१-०३-२७ को राति अज्ञात व्यक्तिले घरको ताला फोडी नगद ५०,००० चोरी गरेको',
-    date: '२०८१-०३-२८',
-  },
-  missingRequiredFields: [],
-  followUpQuestionNepali: null,
-};
-
-function getDemoResult(transcript: string): GemmaAnalysisResult {
-  const lower = transcript.toLowerCase();
-  if (lower.includes('स्वास्थ्य') || lower.includes('मेडिकल') || lower.includes('रोगी') || lower.includes('बिरामी')) {
-    return DEMO_MEDICAL;
-  }
-  if (lower.includes('उजुरी') || lower.includes('चोरी') || lower.includes('पुलिस') || lower.includes('घटना')) {
-    return DEMO_POLICE;
-  }
-  return DEMO_NIVEDAN;
-}
 
 function parseGemmaResponse(text: string): GemmaAnalysisResult {
   const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
@@ -245,12 +193,5 @@ export async function analyzeWithGemma(
     () => callOllama(userPrompt)
   );
 
-  try {
-    return await runWithFallback(providers);
-  } catch (error) {
-    console.warn('[Gemma] All providers failed, falling back to demo');
-    return getDemoResult(rawTranscript);
-  }
+  return runWithFallback(providers);
 }
-
-export { getDemoResult };

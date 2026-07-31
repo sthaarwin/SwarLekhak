@@ -18,11 +18,10 @@ import { supabase } from './src/services/supabaseClient';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const TAB_ICONS: Record<string, { icon: string; activeIcon: string }> = {
-  Record: { icon: '🎤', activeIcon: '🎤' },
-  Templates: { icon: '📄', activeIcon: '📄' },
-  History: { icon: '📋', activeIcon: '📋' },
-  Export: { icon: '📎', activeIcon: '📎' },
+const TAB_ICONS: Record<string, string> = {
+  Record: '🎤',
+  Templates: '📄',
+  History: '📋',
 };
 
 function TabBar({ state, descriptors, navigation: nav }: any) {
@@ -55,20 +54,10 @@ function TabBar({ state, descriptors, navigation: nav }: any) {
               pressed && { transform: [{ scale: 0.95 }] },
             ]}
           >
-            <Text
-              style={[
-                styles.tabIcon,
-                isFocused && styles.tabIconActive,
-              ]}
-            >
-              {tabIcon?.icon}
+            <Text style={[styles.tabIcon, isFocused && styles.tabIconActive]}>
+              {tabIcon}
             </Text>
-            <Text
-              style={[
-                styles.tabLabel,
-                isFocused && styles.tabLabelActive,
-              ]}
-            >
+            <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
               {route.name}
             </Text>
           </Pressable>
@@ -114,7 +103,6 @@ function HomeTabs({ session, navigation, userName }: { session: Session; navigat
         <Tab.Screen name="Record" component={RecordScreen} options={{ headerShown: false }} />
         <Tab.Screen name="Templates" component={TemplatesScreen} options={{ headerShown: false }} />
         <Tab.Screen name="History" component={HistoryScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Export" component={HistoryScreen} options={{ headerShown: false }} />
       </Tab.Navigator>
     </View>
   );

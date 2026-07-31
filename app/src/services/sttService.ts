@@ -1,6 +1,5 @@
 import { File, UploadType } from 'expo-file-system';
 import { TranscriptionResult } from '../types';
-import { normalizeNepaliWords } from './nepaliDictionary';
 import { OLLAMA_BASE_URL, OLLAMA_MODEL } from '../config';
 
 async function transcribeWithGemma(audioUri: string): Promise<string> {
@@ -28,7 +27,7 @@ export async function transcribeAudio(
 
   try {
     const raw = await transcribeWithGemma(audioUri);
-    const transcript = normalizeNepaliWords(raw);
+    const transcript = raw.trim();
     console.log('[STT] Transcription result:', transcript);
 
     if (!transcript || transcript === '[BLANK_AUDIO]') {
