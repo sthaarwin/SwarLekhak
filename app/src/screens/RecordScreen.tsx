@@ -11,6 +11,7 @@ import {
 import { Text, TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
+import * as Speech from 'expo-speech';
 import { useDocumentStore } from '../store/useDocumentStore';
 import { transcribeAudio } from '../services/sttService';
 import { analyzeWithGemma, translateTranscript } from '../services/gemmaService';
@@ -36,6 +37,7 @@ export default function RecordScreen({ navigation }: any) {
   const [micScale] = useState(() => new Animated.Value(1));
   const [clarifying, setClarifying] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [speakingFollowUp, setSpeakingFollowUp] = useState(false);
   const processingRef = useRef(false);
   const player = useAudioPlayer(null);
 
@@ -63,6 +65,7 @@ export default function RecordScreen({ navigation }: any) {
   const isBusy = ['transcribing', 'translating', 'processing'].includes(recordingStatus);
   const isEditing = recordingStatus === 'editing';
   const needsTranslation = isEditing && !!transcript.trim() && !DEVANAGARI_RE.test(transcript);
+  const followUpQuestion = gemmaResult?.followUpQuestionNepali?.trim() || '';
 
   const animatePulse = useCallback(() => {
     Animated.loop(
@@ -127,6 +130,7 @@ export default function RecordScreen({ navigation }: any) {
 
   useEffect(() => {
     return () => {
+      Speech.stop();
       clearConversationHistory();
     };
   }, []);
@@ -136,6 +140,30 @@ export default function RecordScreen({ navigation }: any) {
       player.replace(audioUri);
     }
   }, [audioUri]);
+
+  const stopFollowUpSpeech = useCallback(() => {
+    Speech.stop();
+    setSpeakingFollowUp(false);
+  }, []);
+
+  const speakFollowUp = useCallback((text: string) => {
+    const speechText = text.trim();
+    if (!speechText) return;
+
+    Speech.stop();
+    setSpeakingFollowUp(true);
+    Speech.speak(speechText, {
+      language: 'ne-NP',
+      rate: 0.92,
+      pitch: 1,
+      onDone: () => setSpeakingFollowUp(false),
+      onStopped: () => setSpeakingFollowUp(false),
+      onError: () => {
+        setSpeakingFollowUp(false);
+        setError('प्रश्न सुनाउन सकिएन');
+      },
+    });
+  }, [setError]);
 
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],
@@ -167,6 +195,9 @@ export default function RecordScreen({ navigation }: any) {
         addToConversationHistory({ role: 'assistant', content: result.followUpQuestionNepali || '' });
         setAudioUri(null);
         setRecordingStatus('idle');
+        if (result.followUpQuestionNepali) {
+          speakFollowUp(result.followUpQuestionNepali);
+        }
       } else {
         addToConversationHistory({ role: 'user', content: transcript });
         addToHistory(
@@ -192,6 +223,7 @@ export default function RecordScreen({ navigation }: any) {
   };
 
   const handleMicPress = async () => {
+    stopFollowUpSpeech();
     if (isRecording) {
       try {
         const uri = await stopRecording();
@@ -225,6 +257,7 @@ export default function RecordScreen({ navigation }: any) {
   };
 
   const handlePlayPause = () => {
+    stopFollowUpSpeech();
     if (player.playing) {
       player.pause();
     } else {
@@ -233,6 +266,7 @@ export default function RecordScreen({ navigation }: any) {
   };
 
   const handleConfirm = async () => {
+    stopFollowUpSpeech();
     player.pause();
     player.seekTo(0);
     if (!audioUri) return;
@@ -251,6 +285,7 @@ export default function RecordScreen({ navigation }: any) {
   };
 
   const handleUseText = async () => {
+    stopFollowUpSpeech();
     const text = transcript.trim();
     if (!text) {
       setError('कृपया पाठ सम्पादन गर्नुहोस्');
@@ -279,6 +314,7 @@ export default function RecordScreen({ navigation }: any) {
   };
 
   const handleReRecord = () => {
+    stopFollowUpSpeech();
     player.pause();
     player.seekTo(0);
     setError(null);
@@ -335,8 +371,8 @@ export default function RecordScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.glowTop} pointerEvents="none" />
-      <View style={styles.glowBottom} pointerEvents="none" />
+      {/* <View style={styles.glowTop} pointerEvents="none" />
+      <View style={styles.glowBottom} pointerEvents="none" /> */}
 
       {/* Template Carousel (hide during preview) */}
       {!isPreview && !isBusy && (
@@ -382,7 +418,31 @@ export default function RecordScreen({ navigation }: any) {
       {/* Clarification Banner */}
       {clarifying && gemmaResult?.followUpQuestionNepali && (
         <View style={styles.clarificationBanner}>
-          <Text style={styles.clarificationLabel}>प्रश्न:</Text>
+          <View style={styles.clarificationHeader}>
+            <Text style={styles.clarificationLabel}>प्रश्न:</Text>
+            <Pressable
+              onPress={() => {
+                if (speakingFollowUp) {
+                  stopFollowUpSpeech();
+                } else {
+                  speakFollowUp(followUpQuestion);
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={speakingFollowUp ? 'प्रश्न सुनाउन रोक्नुहोस्' : 'प्रश्न सुन्नुहोस्'}
+              style={({ pressed }) => [
+                styles.speechButton,
+                speakingFollowUp && styles.speechButtonActive,
+                pressed && { transform: [{ scale: 0.94 }] },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={speakingFollowUp ? 'volume-off' : 'volume-high'}
+                size={18}
+                color={speakingFollowUp ? '#fff' : colors.tertiary}
+              />
+            </Pressable>
+          </View>
           <Text style={styles.clarificationText}>
             {gemmaResult.followUpQuestionNepali}
           </Text>
@@ -631,6 +691,7 @@ export default function RecordScreen({ navigation }: any) {
         {clarifying && (
           <Pressable
             onPress={async () => {
+              stopFollowUpSpeech();
               setClarifying(false);
               clearConversationHistory();
               setRecordingStatus('complete');
@@ -712,12 +773,31 @@ const styles = StyleSheet.create({
     borderColor: colors.tertiary,
     borderRadius: 12,
   },
+  clarificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 4,
+  },
   clarificationLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: colors.tertiary,
-    marginBottom: 4,
     textTransform: 'uppercase',
+  },
+  speechButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.tertiary,
+    backgroundColor: colors.surfaceContainerLowest,
+  },
+  speechButtonActive: {
+    backgroundColor: colors.tertiary,
   },
   clarificationText: {
     fontSize: 18,
@@ -826,6 +906,12 @@ const styles = StyleSheet.create({
     backgroundColor: `${colors.error}20`,
     borderWidth: 1,
     borderColor: colors.error,
+  },
+  previewActionReRecordLabel: {
+    color: colors.error,
+  },
+  previewActionComplete: {
+    backgroundColor: colors.primary,
   },
   previewActionConfirm: {
     backgroundColor: colors.primary,
