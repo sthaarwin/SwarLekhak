@@ -154,6 +154,13 @@ export default function RecordScreen({ navigation }: any) {
     try {
       setRecordingStatus('processing');
       const result = await analyzeWithGemma(transcript, conversationHistory, selectedTemplate);
+
+      if (gemmaResult?.extractedFields) {
+        result.extractedFields = { ...gemmaResult.extractedFields, ...result.extractedFields };
+        result.missingRequiredFields = (result.missingRequiredFields || []).filter(
+          (f) => !result.extractedFields[f]
+        );
+      }
       setGemmaResult(result);
 
       if (result.missingRequiredFields && result.missingRequiredFields.length > 0) {

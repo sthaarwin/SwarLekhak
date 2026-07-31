@@ -190,7 +190,7 @@ export default function DocumentScreen() {
 
   <p class="paragraph">
     ठेगाना: <span class="field-value">${address}</span>
-    {${wardNo ? `<br>वडा नं: <span class="field-value">${wardNo}</span>` : ''}}
+    ${wardNo ? `<br>वडा नं: <span class="field-value">${wardNo}</span>` : ''}
     ${incidentDetails ? `<br>घटना विवरण: <span class="field-value">${incidentDetails}</span>` : ''}
   </p>
 

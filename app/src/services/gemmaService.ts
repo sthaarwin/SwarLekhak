@@ -38,9 +38,10 @@ ${conversationContext}Latest user input: "${rawTranscript}"${templateHint}
 Tasks:
 1. Detect Document Type: NIVEDAN, MEDICAL, or POLICE_REPORT${selectedTemplate && selectedTemplate !== 'AUTO' ? ` (user selected: ${selectedTemplate})` : ''}.
 2. Extract available entities (Name, Address, Ward Number, Subject, Incident details, Dates).
-3. Identify crucial missing information required for an official government application.
-4. Calculate a confidence score (0.0 to 1.0) on transcription clarity.
-5. If required fields are missing, draft a natural, polite follow-up question in Nepali.
+3. The "Latest user input" may be the user's ANSWER to the Assistant's previous question. Use it to fill the field that was previously missing. Carry forward every field already present in "Previous conversation" into the output extractedFields.
+4. Identify crucial missing information still required for an official government application. Do NOT list a field as missing if its value already appears in the conversation.
+5. Calculate a confidence score (0.0 to 1.0) on transcription clarity.
+6. If required fields are still missing, draft a natural, polite follow-up question in Nepali.
 
 Output strict JSON matching this structure:
 {
