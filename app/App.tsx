@@ -157,7 +157,7 @@ export default function App() {
         .eq('id', userId)
         .single();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching user profile:', error);
       } else if (data?.full_name) {
         setUserName(data.full_name);

@@ -33,7 +33,13 @@ export default function RecordScreen({ navigation }: any) {
   const [micScale] = useState(() => new Animated.Value(1));
   const [clarifying, setClarifying] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
   const player = useAudioPlayer(null);
+
+  const log = useCallback((msg: string) => {
+    console.log('[Record]', msg);
+    setDebugLog((prev) => [msg, ...prev].slice(0, 8));
+  }, []);
 
   const {
     recordingStatus,
@@ -174,7 +180,9 @@ export default function RecordScreen({ navigation }: any) {
   const handleMicPress = async () => {
     if (isRecording) {
       try {
+        log('Stopping recording...');
         const uri = await stopRecording();
+        log('Recording saved: ' + uri);
         setRecordedUri(uri);
         setAudioUri(uri);
         if (!uri) {
@@ -184,21 +192,26 @@ export default function RecordScreen({ navigation }: any) {
         }
         setRecordingStatus('preview');
       } catch (err: any) {
+        log('ERROR stopping: ' + err.message);
         setError(err.message);
         setRecordingStatus('idle');
       }
     } else {
       try {
+        log('Requesting mic permission...');
         const hasPermission = await requestRecordPermission();
         if (!hasPermission) {
           setError('माइक्रोफोन अनुमति आवश्यक छ');
           return;
         }
         setError(null);
+        log('Starting recording...');
         await startRecording();
+        log('Recording started');
         setRecordingStatus('recording');
         setAudioUri(null);
       } catch (err: any) {
+        log('ERROR starting: ' + err.message);
         setError(err.message);
         setRecordingStatus('idle');
       }
@@ -466,6 +479,13 @@ export default function RecordScreen({ navigation }: any) {
           </View>
         )}
 
+        {/* Debug Log */}
+        <View style={styles.debugPanel}>
+          {debugLog.map((line, i) => (
+            <Text key={i} style={styles.debugLine}>{line}</Text>
+          ))}
+        </View>
+
         {/* Skip clarification */}
         {clarifying && (
           <Pressable
@@ -715,5 +735,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary,
+  },
+  debugPanel: {
+    marginTop: 12,
+    padding: 10,
+    alignSelf: 'stretch',
+    backgroundColor: '#000',
+    borderRadius: 8,
+    minHeight: 30,
+  },
+  debugLine: {
+    fontSize: 11,
+    color: '#0f0',
+    fontFamily: 'monospace',
+    lineHeight: 16,
   },
 });

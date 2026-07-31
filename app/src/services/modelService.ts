@@ -26,7 +26,7 @@ export async function ensureModelDownloaded(
 
   console.log('[Model] Downloading base model...');
   const dir = getModelDir();
-  await dir.create({ intermediates: true });
+  await dir.create({ intermediates: true, idempotent: true });
 
   const downloaded = await File.downloadFileAsync(MODEL_URL, modelFile, {
     onProgress: ({ bytesWritten, totalBytes }) => {

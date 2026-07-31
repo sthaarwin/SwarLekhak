@@ -23,13 +23,20 @@ export async function transcribeAudio(audioUri: string): Promise<TranscriptionRe
   try {
     const ctx = await getWhisperContext();
     const { promise } = ctx.transcribe(audioUri, {
-      language: 'ne',
+      language: 'auto',
       maxThreads: 4,
     });
 
     const result = await promise;
     const transcript = (result.result || '').trim();
     console.log('[STT] Transcription result:', transcript);
+
+    const hasDevanagari = /[\u0900-\u097F]/.test(transcript);
+    const hasLatin = /[A-Za-z]/.test(transcript);
+    if (!hasDevanagari && !hasLatin) {
+      console.warn('[STT] Unsupported script in transcript');
+      throw new Error('कृपया अंग्रेजी, नेपाली वा हिन्दीमा बोल्नुहोस्');
+    }
 
     if (!transcript || transcript === '[BLANK_AUDIO]') {
       throw new Error('कृपया फेरि प्रयास गर्नुहोस् — अडियो स्पष्ट छैन');
