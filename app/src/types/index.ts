@@ -1,7 +1,5 @@
 export type DocumentType = 'NIVEDAN' | 'MEDICAL' | 'POLICE_REPORT';
 
-export type SttModel = 'tiny' | 'base' | 'small';
-
 export type RecordingStatus = 'idle' | 'recording' | 'preview' | 'editing' | 'translating' | 'transcribing' | 'processing' | 'complete' | 'error';
 
 export interface ExtractedFields {
@@ -46,7 +44,6 @@ export interface DocumentState {
   gemmaResult: GemmaAnalysisResult | null;
   error: string | null;
   selectedTemplate: DocumentType | 'AUTO';
-  sttModel: SttModel;
   history: HistoryItem[];
   conversationHistory: ConversationEntry[];
 }

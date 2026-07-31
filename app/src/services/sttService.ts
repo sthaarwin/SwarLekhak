@@ -1,33 +1,7 @@
 import { File, UploadType } from 'expo-file-system';
-import { initWhisper, WhisperContext } from 'whisper.rn';
-import { TranscriptionResult, SttModel } from '../types';
-import { ensureModelDownloaded } from './modelService';
+import { TranscriptionResult } from '../types';
 import { normalizeNepaliWords } from './nepaliDictionary';
-import { STT_PROVIDER, OLLAMA_BASE_URL, OLLAMA_MODEL } from '../config';
-
-let whisperContext: WhisperContext | null = null;
-let whisperModel: SttModel | null = null;
-
-async function getWhisperContext(model: SttModel): Promise<WhisperContext> {
-  if (whisperContext && whisperModel === model) return whisperContext;
-
-  if (whisperContext) {
-    console.log(`[STT] Releasing previous ${whisperModel} context...`);
-    whisperContext.release();
-    whisperContext = null;
-    whisperModel = null;
-  }
-
-  const modelPath = await ensureModelDownloaded(model);
-  console.log(`[STT] Initializing whisper context (${model})...`);
-  whisperContext = await initWhisper({
-    filePath: modelPath,
-    useGpu: false,
-  });
-  whisperModel = model;
-  console.log(`[STT] Whisper context ready (${model})`);
-  return whisperContext;
-}
+import { OLLAMA_BASE_URL, OLLAMA_MODEL } from '../config';
 
 async function transcribeWithGemma(audioUri: string): Promise<string> {
   console.log('[STT] Gemma STT from:', audioUri);
@@ -48,29 +22,12 @@ async function transcribeWithGemma(audioUri: string): Promise<string> {
 }
 
 export async function transcribeAudio(
-  audioUri: string,
-  onNewSegments?: (partial: string) => void,
-  model: SttModel = 'base'
+  audioUri: string
 ): Promise<TranscriptionResult> {
-  console.log(`[STT] Transcribing audio (${STT_PROVIDER}, ${model}) from:`, audioUri);
+  console.log('[STT] Transcribing audio from:', audioUri);
 
   try {
-    const raw =
-      STT_PROVIDER === 'gemma'
-        ? await transcribeWithGemma(audioUri)
-        : await (async () => {
-            const ctx = await getWhisperContext(model);
-            const { promise } = ctx.transcribe(audioUri, {
-              language: 'ne',
-              maxThreads: 4,
-              onNewSegments: onNewSegments
-                ? (result) => onNewSegments(normalizeNepaliWords(result.result))
-                : undefined,
-            });
-            const result = await promise;
-            return (result.result || '').trim();
-          })();
-
+    const raw = await transcribeWithGemma(audioUri);
     const transcript = normalizeNepaliWords(raw);
     console.log('[STT] Transcription result:', transcript);
 
@@ -87,14 +44,6 @@ export async function transcribeAudio(
   } catch (error: any) {
     console.error('[STT] Transcription failed:', error);
     throw error;
-  }
-}
-
-export function releaseWhisper() {
-  if (whisperContext) {
-    whisperContext.release();
-    whisperContext = null;
-    whisperModel = null;
   }
 }
 
@@ -118,7 +67,7 @@ function assertNepaliOrEnglish(transcript: string): void {
   for (const char of transcript) {
     if (!isAllowed(char)) {
       console.warn('[STT] Rejected transcript with non-Nepali/English script:', transcript);
-      throw new Error('पहिचान असफल — राम्रो (🐢) STT मोडेल छानेर फेरि प्रयास गर्नुहोस्');
+      throw new Error('पहिचान असफल — कृपया फेरि प्रयास गर्नुहोस्');
     }
   }
 }

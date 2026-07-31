@@ -14,9 +14,8 @@ import { useDocumentStore } from '../store/useDocumentStore';
 import { transcribeAudio } from '../services/sttService';
 import { analyzeWithGemma, translateTranscript } from '../services/gemmaService';
 import { startRecording, stopRecording, requestRecordPermission } from '../services/wavRecorderService';
-import { STT_PROVIDER } from '../config';
 import { colors, spacing } from '../theme';
-import type { DocumentType, SttModel } from '../types';
+import type { DocumentType } from '../types';
 
 const BAR_COUNT = 32;
 const TEMPLATES: { id: DocumentType | 'AUTO'; title: string; icon: string; color: string }[] = [
@@ -24,12 +23,6 @@ const TEMPLATES: { id: DocumentType | 'AUTO'; title: string; icon: string; color
   { id: 'NIVEDAN', title: 'निवेदन', icon: '📄', color: colors.govBlueDark },
   { id: 'MEDICAL', title: 'स्वास्थ्य', icon: '🏥', color: colors.tertiary },
   { id: 'POLICE_REPORT', title: 'प्रहरी उजुरी', icon: '⚖️', color: colors.secondary },
-];
-
-const STT_MODELS: { id: SttModel; label: string; hint: string }[] = [
-  { id: 'tiny', label: '⚡ छिटो', hint: 'छिटो, कम सटीक' },
-  { id: 'base', label: 'मध्यम', hint: 'सन्तुलित' },
-  { id: 'small', label: '🐢 राम्रो', hint: 'ढिलो, राम्रो STT' },
 ];
 
 export default function RecordScreen({ navigation }: any) {
@@ -67,8 +60,6 @@ export default function RecordScreen({ navigation }: any) {
     rawTranscript,
     selectedTemplate,
     setSelectedTemplate,
-    sttModel,
-    setSttModel,
     conversationHistory,
   } = useDocumentStore();
 
@@ -253,11 +244,7 @@ export default function RecordScreen({ navigation }: any) {
       setLiveTranscript('');
       setTranslatedText('');
       setIsEditingTranslation(false);
-      const transcription = await transcribeAudio(
-        recordedUri,
-        (partial) => setLiveTranscript(partial),
-        sttModel
-      );
+      const transcription = await transcribeAudio(recordedUri);
       setRawTranscript(transcription.rawTranscript);
       setLiveTranscript(transcription.rawTranscript);
       setRecordingStatus('editing');
@@ -375,32 +362,6 @@ export default function RecordScreen({ navigation }: any) {
               );
             })}
           </ScrollView>
-        </View>
-      )}
-
-      {/* STT Model Picker (hide during preview, whisper-only) */}
-      {!isPreview && STT_PROVIDER === 'whisper' && (
-        <View style={styles.sttPickerSection}>
-          {STT_MODELS.map((m) => {
-            const isActive = sttModel === m.id;
-            return (
-              <Pressable
-                key={m.id}
-                onPress={() => setSttModel(m.id)}
-                style={[
-                  styles.sttPickerChip,
-                  isActive && { backgroundColor: colors.secondary, borderColor: colors.secondary },
-                ]}
-              >
-                <Text style={[styles.sttPickerLabel, isActive && { color: '#fff' }]}>
-                  {m.label}
-                </Text>
-                <Text style={[styles.sttPickerHint, isActive && { color: '#fff' }]}>
-                  {m.hint}
-                </Text>
-              </Pressable>
-            );
-          })}
         </View>
       )}
 
@@ -702,32 +663,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.textMain,
-  },
-  sttPickerSection: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.containerMargin,
-    paddingBottom: 4,
-    gap: 8,
-  },
-  sttPickerChip: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  sttPickerLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMain,
-  },
-  sttPickerHint: {
-    fontSize: 10,
-    color: colors.textMuted,
-    marginTop: 2,
   },
   clarificationBanner: {
     marginHorizontal: spacing.containerMargin,
